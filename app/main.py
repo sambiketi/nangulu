@@ -14,7 +14,7 @@ import logging
 
 from app.database import engine, get_db, test_connection
 from app import models
-from app.routers import auth
+from app.routers import auth, inventory
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +71,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api")
 
 # Health endpoint with contract compliance
 @app.get("/health")
@@ -94,7 +95,8 @@ async def health_check(db: Session = Depends(get_db)):
         "timestamp": os.environ.get("RENDER_GIT_COMMIT", "local"),
         "environment": os.environ.get("RENDER", "development"),
         "version": "1.0.0",
-        "driver": "psycopg3" if "psycopg" in os.getenv("DATABASE_URL", "") else "unknown"
+        "driver": "psycopg3" if "psycopg" in os.getenv("DATABASE_URL", "") else "unknown",
+        "step": "4 - inventory + ledger logic implemented"
     }
 
 # Root endpoint
@@ -105,10 +107,12 @@ async def root():
         "version": "1.0.0",
         "description": "KGs as source of truth - Append-only ledger - Full audit trail",
         "contract": "psycopg3 + SQLAlchemy 2.x enforced",
+        "step": "4 - inventory + ledger logic",
         "endpoints": {
             "docs": "/api/docs",
             "health": "/health",
             "auth": "/api/auth/login",
+            "inventory": "/api/inventory",
             "api": "/api"
         }
     }
@@ -122,7 +126,6 @@ async def contract_test(db: Session = Depends(get_db)):
     """
     try:
         # Contract: Use SQLAlchemy 2.x select() pattern
-        from sqlalchemy import select
         stmt = select(models.User).limit(1)
         result = db.execute(stmt)
         user_count = result.scalar_one_or_none()
@@ -132,7 +135,12 @@ async def contract_test(db: Session = Depends(get_db)):
             "sqlalchemy_version": "2.x",
             "driver": "psycopg3",
             "database": "connected",
-            "test": "passed" if user_count is not None else "no_users"
+            "test": "passed" if user_count is not None else "no_users",
+            "features": {
+                "inventory": "implemented",
+                "ledger": "append-only",
+                "audit": "enabled"
+            }
         }
     except Exception as e:
         return {

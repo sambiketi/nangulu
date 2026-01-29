@@ -1,6 +1,6 @@
 """
-SQLAlchemy models matching the provided database schema exactly.
-No modifications, no additions - strict schema compliance.
+SQLAlchemy 2.x models with proper patterns.
+Contract: Use only 2.x syntax, avoid mixing v1 patterns.
 """
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB, INET

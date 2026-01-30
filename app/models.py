@@ -141,7 +141,7 @@ class ArchiveOperation(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
     error_message = Column(Text)
-    metadata = Column(JSONB)
+    operationdata = Column(JSONB)
     
     # Relationships
     performer = relationship("User")

@@ -125,3 +125,57 @@ class CashierSession(Base):
     
     # Relationship
     cashier = relationship("User")
+
+class ArchiveOperation(Base):
+    __tablename__ = "archive_operations"
+    
+    id = Column(Integer, primary_key=True)
+    action = Column(String(20), nullable=False)
+    snapshot_type = Column(String(20))
+    description = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default='PENDING')
+    performed_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    records_affected = Column(Integer)
+    file_path = Column(Text)
+    file_size = Column(Integer)
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True))
+    error_message = Column(Text)
+    metadata = Column(JSONB)
+    
+    # Relationships
+    performer = relationship("User")
+    archived_sales = relationship("ArchivedSale", back_populates="archive_operation")
+
+class SystemSnapshot(Base):
+    __tablename__ = "system_snapshots"
+    
+    id = Column(Integer, primary_key=True)
+    snapshot_type = Column(String(20), nullable=False)
+    snapshot_data = Column(JSONB, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True))
+    is_active = Column(Boolean, default=True)
+    
+    # Relationships
+    creator = relationship("User")
+
+class ArchivedSale(Base):
+    __tablename__ = "archived_sales"
+    
+    id = Column(Integer, primary_key=True)
+    sale_number = Column(String(20), nullable=False)
+    item_id = Column(Integer, nullable=False)
+    kg_sold = Column(Numeric(10, 3), nullable=False)
+    price_per_kg_snapshot = Column(Numeric(10, 2), nullable=False)
+    total_price = Column(Numeric(12, 2))
+    cashier_id = Column(Integer, nullable=False)
+    customer_name = Column(String(100))
+    status = Column(String(10), nullable=False)
+    original_created_at = Column(DateTime(timezone=True), nullable=False)
+    archived_at = Column(DateTime(timezone=True), server_default=func.now())
+    archive_operation_id = Column(Integer, ForeignKey("archive_operations.id"))
+    
+    # Relationships
+    archive_operation = relationship("ArchiveOperation", back_populates="archived_sales")

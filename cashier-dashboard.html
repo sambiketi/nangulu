@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="earth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <title>Cashier Dashboard | Nangulu POS</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/chicken.svg">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-left">
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                </svg>
+            </button>
+            <div class="brand">
+                <h1 class="app-name">Nangulu POS</h1>
+                <span class="user-role" id="userRole">Cashier Dashboard</span>
+            </div>
+        </div>
+        
+        <div class="nav-right">
+            <div class="user-info">
+                <span class="user-name" id="userName">Loading...</span>
+                <span class="user-status" id="connectionStatus">● Online</span>
+            </div>
+            <div class="datetime" id="currentDateTime">
+                Loading...
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Layout -->
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <nav class="sidebar-nav">
+                <a href="cashier-dashboard.html" class="nav-link active" data-page="dashboard">
+                    <svg class="nav-icon"><use href="assets/icons.svg#dashboard"></use></svg>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="new-sale.html" class="nav-link" data-page="new-sale">
+                    <svg class="nav-icon"><use href="assets/icons.svg#cart"></use></svg>
+                    <span class="nav-text">New Sale</span>
+                </a>
+                <a href="sales-list.html" class="nav-link" data-page="sales">
+                    <svg class="nav-icon"><use href="assets/icons.svg#history"></use></svg>
+                    <span class="nav-text">My Sales</span>
+                </a>
+                <a href="stock-view.html" class="nav-link" data-page="stock">
+                    <svg class="nav-icon"><use href="assets/icons.svg#package"></use></svg>
+                    <span class="nav-text">Stock View</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                
+                <button class="nav-link nav-action" id="printReceiptBtn">
+                    <svg class="nav-icon"><use href="assets/icons.svg#printer"></use></svg>
+                    <span class="nav-text">Print Last Receipt</span>
+                </button>
+                
+                <div class="nav-spacer"></div>
+                
+                <button class="nav-link nav-action" id="changePasswordBtn">
+                    <svg class="nav-icon"><use href="assets/icons.svg#key"></use></svg>
+                    <span class="nav-text">Change Password</span>
+                </button>
+                <button class="nav-link nav-action logout-btn" id="logoutBtn">
+                    <svg class="nav-icon"><use href="assets/icons.svg#logout"></use></svg>
+                    <span class="nav-text">Logout</span>
+                </button>
+            </nav>
+            
+            <!-- Contract Reminder -->
+            <div class="contract-sidebar">
+                <div class="contract-item">
+                    <span class="contract-icon">⚖️</span>
+                    <span class="contract-text">KG = Source of Truth</span>
+                </div>
+                <div class="contract-item">
+                    <span class="contract-icon">📝</span>
+                    <span class="contract-text">Append-Only Ledger</span>
+                </div>
+                <div class="contract-item">
+                    <span class="contract-icon">🔍</span>
+                    <span class="contract-text">Full Audit Trail</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <!-- Dashboard Header -->
+            <div class="dashboard-header">
+                <h2 class="page-title">Dashboard</h2>
+                <div class="header-actions">
+                    <button class="btn btn-secondary btn-icon" id="refreshDashboard">
+                        <svg width="20" height="20"><use href="assets/icons.svg#refresh"></use></svg>
+                        Refresh
+                    </button>
+                    <div class="last-updated" id="lastUpdated">
+                        Updated: Just now
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="metrics-grid" id="metricsGrid">
+                <!-- Today's Sales -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <h3 class="metric-title">Today's Sales</h3>
+                        <span class="metric-trend positive" id="salesTrend">+0%</span>
+                    </div>
+                    <div class="metric-value" id="todaySales">0</div>
+                    <div class="metric-subtext">Transactions</div>
+                    <div class="metric-detail" id="todayRevenue">$0.00</div>
+                </div>
+
+                <!-- Current Stock Value -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <h3 class="metric-title">Available Stock</h3>
+                        <span class="stock-status-badge normal" id="stockStatus">Normal</span>
+                    </div>
+                    <div class="metric-value" id="totalStock">0.000 kg</div>
+                    <div class="metric-subtext">Total Quantity</div>
+                    <div class="metric-detail" id="stockValue">$0.00 value</div>
+                </div>
+
+                <!-- Active Alerts -->
+                <div class="metric-card alert-card">
+                    <div class="metric-header">
+                        <h3 class="metric-title">Active Alerts</h3>
+                        <span class="alert-count" id="alertCount">0</span>
+                    </div>
+                    <div class="metric-value" id="criticalAlerts">0</div>
+                    <div class="metric-subtext">Critical Items</div>
+                    <div class="alert-list" id="alertList">
+                        <div class="no-alerts">No active alerts</div>
+                    </div>
+                </div>
+
+                <!-- Session Info -->
+                <div class="metric-card session-card">
+                    <div class="metric-header">
+                        <h3 class="metric-title">Current Session</h3>
+                        <span class="session-timer" id="sessionTimer">00:00:00</span>
+                    </div>
+                    <div class="metric-value" id="sessionStart">--:--</div>
+                    <div class="metric-subtext">Started At</div>
+                    <div class="session-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Avg. Sale:</span>
+                            <span class="stat-value" id="avgSale">$0.00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Best Item:</span>
+                            <span class="stat-value" id="bestItem">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="activity-section">
+                <div class="section-header">
+                    <h3>Recent Activity</h3>
+                    <button class="btn btn-text" id="viewAllSales">View All →</button>
+                </div>
+                <div class="activity-table-container">
+                    <table class="activity-table" id="recentActivity">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Sale #</th>
+                                <th>Item</th>
+                                <th>KG</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Filled by JavaScript -->
+                            <tr class="loading-row">
+                                <td colspan="6">
+                                    <div class="loading-spinner"></div>
+                                    Loading recent activity...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h3>Quick Actions</h3>
+                <div class="actions-grid">
+                    <button class="action-card" id="quickSaleBtn" data-action="new-sale">
+                        <div class="action-icon primary">
+                            <svg><use href="assets/icons.svg#cart-plus"></use></svg>
+                        </div>
+                        <div class="action-content">
+                            <h4>New Sale</h4>
+                            <p>Create a new sale transaction</p>
+                        </div>
+                        <div class="action-arrow">→</div>
+                    </button>
+                    
+                    <button class="action-card" id="stockCheckBtn" data-action="stock-check">
+                        <div class="action-icon warning">
+                            <svg><use href="assets/icons.svg#alert"></use></svg>
+                        </div>
+                        <div class="action-content">
+                            <h4>Check Stock</h4>
+                            <p>View stock levels & alerts</p>
+                        </div>
+                        <div class="action-arrow">→</div>
+                    </button>
+                    
+                    <button class="action-card" id="printReportBtn" data-action="print-report">
+                        <div class="action-icon info">
+                            <svg><use href="assets/icons.svg#printer"></use></svg>
+                        </div>
+                        <div class="action-content">
+                            <h4>Daily Report</h4>
+                            <p>Print today's summary</p>
+                        </div>
+                        <div class="action-arrow">→</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contract Compliance Banner -->
+            <div class="compliance-banner">
+                <div class="compliance-icon">✅</div>
+                <div class="compliance-content">
+                    <h4>System Contract Active</h4>
+                    <p>KG precision (3 decimals) • Real-time stock validation • Append-only ledger • Full audit trail</p>
+                </div>
+                <div class="compliance-status">
+                    <span class="status-indicator active"></span>
+                    <span class="status-text">100% Compliant</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Icons Sprite -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="hidden" id="iconsSprite">
+        <!-- Dashboard icons will be added here -->
+    </svg>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+</html>

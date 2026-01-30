@@ -1,0 +1,210 @@
+/* Authentication Pages */
+.auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--earth-sand) 0%, var(--earth-light) 100%);
+    padding: var(--spacing-md);
+}
+
+.auth-card {
+    background-color: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    max-width: 400px;
+    padding: var(--spacing-xl);
+    animation: slide-up 0.5s ease;
+}
+
+@keyframes slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.logo-header {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+}
+
+.logo-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--spacing-md);
+    background-color: var(--earth-light);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-icon svg {
+    width: 32px;
+    height: 32px;
+    color: white;
+}
+
+.logo-text {
+    font-size: 2rem;
+    color: var(--earth-dark);
+    margin-bottom: var(--spacing-xs);
+}
+
+.logo-subtitle {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.contract-badge {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xl);
+    justify-content: center;
+}
+
+.contract-tag {
+    background-color: var(--earth-sand);
+    color: var(--earth-dark);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.auth-form {
+    margin-bottom: var(--spacing-xl);
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+}
+
+.form-label .icon {
+    color: var(--gray-500);
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+}
+
+.form-actions {
+    margin-top: var(--spacing-xl);
+}
+
+.error-container {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: rgba(217, 4, 41, 0.1);
+    border: 1px solid rgba(217, 4, 41, 0.2);
+    border-radius: var(--radius-md);
+    display: none;
+}
+
+.error-container.visible {
+    display: block;
+    animation: fade-in 0.3s ease;
+}
+
+.error-message {
+    color: var(--danger);
+    font-size: 0.875rem;
+}
+
+.credentials-info {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--gray-300);
+}
+
+.credentials-info summary {
+    cursor: pointer;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+.credentials-list {
+    margin-top: var(--spacing-sm);
+}
+
+.credential-item {
+    padding: var(--spacing-xs) 0;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+.security-warning {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: rgba(255, 159, 28, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--warning);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.contract-footer {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--gray-300);
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+}
+
+.contract-footer p {
+    margin-bottom: var(--spacing-xs);
+}
+
+.api-status {
+    margin-top: var(--spacing-sm);
+    font-weight: 500;
+}
+
+.api-status.connected {
+    color: var(--success);
+}
+
+.api-status.disconnected {
+    color: var(--danger);
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Mobile adjustments for auth */
+@media (max-width: 767.98px) {
+    .auth-card {
+        padding: var(--spacing-lg);
+        margin: var(--spacing-sm);
+    }
+    
+    .logo-text {
+        font-size: 1.75rem;
+    }
+    
+    .contract-tag {
+        font-size: 0.6875rem;
+        padding: 0.25rem 0.5rem;
+    }
+}

@@ -8,6 +8,61 @@ import uuid
 router = APIRouter()
 
 # -----------------------------
+# -----------------------------
+# Admin dashboard route
+# -----------------------------
+@router.get("/dashboard")
+def admin_dashboard(request: Request, db: Session = Depends(get_db)):
+    # Get user role from session
+    role = request.session.get("role")
+
+    # Allow access only to admins
+    if role != "admin":
+        return RedirectResponse("/", status_code=302)
+
+    # Load all cashiers
+    cashiers = db.query(User).all()
+
+    # Load inventory data
+    inventory = db.query(InventoryItem).all()
+
+    # Render admin dashboard
+    return templates.TemplateResponse(
+        "admin_dashboard.html",
+        {
+            "request": request,
+            "cashiers": cashiers,
+            "inventory": inventory
+        }
+    )
+# -----------------------------
+# Cashier dashboard route
+# -----------------------------
+@router.get("/dashboard")
+def cashier_dashboard(request: Request, db: Session = Depends(get_db)):
+    # Get user role from session
+    role = request.session.get("role")
+
+    # Allow access only to cashiers
+    if role != "cashier":
+        return RedirectResponse("/", status_code=302)
+
+    # Load inventory for selling
+    inventory = db.query(InventoryItem).all()
+
+    # Load sales history
+    sales = db.query(Sale).all()
+
+    # Render cashier dashboard
+    return templates.TemplateResponse(
+        "cashier_dashboard.html",
+        {
+            "request": request,
+            "inventory": inventory,
+            "sales": sales
+        }
+    )
+
 # Confirm sale
 # -----------------------------
 @router.post("/sales")

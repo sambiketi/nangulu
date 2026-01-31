@@ -26,7 +26,9 @@ app.include_router(cashier.router, prefix="/api/cashier", tags=["cashier"])
 # Root login page
 @app.get("/")
 def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Pop error message from session if it exists
+    error = request.session.pop("error", None)
+    return templates.TemplateResponse("index.html", {"request": request, "error": error})
 
 @app.get("/health")
 def health():

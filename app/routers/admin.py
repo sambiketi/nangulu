@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
+
 from app.models import User, InventoryItem, InventoryLedger
 from app.schemas import UserCreate
 from app.dependencies import get_db, get_current_admin, get_password_hash
+
+# IMPORTANT: import templates from main
+from app.main import templates
 
 router = APIRouter()
 
@@ -34,6 +38,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "inventory": inventory
         }
     )
+
 # -----------------------------
 # Create new cashier
 # -----------------------------
@@ -83,13 +88,13 @@ def add_purchase(
     if kg_added <= 0 or purchase_price_per_kg <= 0:
         raise HTTPException(400, "Invalid kg or price")
 
-    if item_id:  # Add stock to existing item
+    if item_id:
         item = db.query(InventoryItem).get(item_id)
         if not item:
             raise HTTPException(404, "Item not found")
         item.current_price_per_kg = purchase_price_per_kg
         db.add(item)
-    else:  # Create new item
+    else:
         item = InventoryItem(
             name=name,
             description=description,
@@ -99,7 +104,6 @@ def add_purchase(
         db.commit()
         db.refresh(item)
 
-    # Record in inventory ledger
     ledger = InventoryLedger(
         item_id=item.id,
         kg_change=kg_added,
@@ -116,7 +120,12 @@ def add_purchase(
 # Set selling price
 # -----------------------------
 @router.patch("/inventory/{item_id}/price")
-def set_selling_price(item_id: int, price: float = Query(..., gt=0), db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def set_selling_price(
+    item_id: int,
+    price: float = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
     item = db.query(InventoryItem).get(item_id)
     if not item:
         raise HTTPException(404, "Item not found")
@@ -124,45 +133,42 @@ def set_selling_price(item_id: int, price: float = Query(..., gt=0), db: Session
     db.commit()
     return {"id": item.id, "new_price": item.current_price_per_kg}
 
-# --- existing imports ---
+# -----------------------------
+# Download Inventory Ledger
+# -----------------------------
 import csv
 from fastapi.responses import StreamingResponse
 from io import StringIO
 from datetime import datetime
 
-# -----------------------------
-# All your existing endpoints
-# -----------------------------
-# create_cashier(...)
-# deactivate_cashier(...)
-# add_purchase(...)
-# set_selling_price(...)
-
-# -----------------------------
-# Download Inventory Ledger
-# -----------------------------
 @router.get("/ledger/download")
 def download_ledger(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    ledger_entries = db.query(InventoryLedger).order_by(InventoryLedger.created_at.desc()).all()
-    
-    # Create CSV in memory
+    ledger_entries = db.query(InventoryLedger).order_by(
+        InventoryLedger.created_at.desc()
+    ).all()
+
     output = StringIO()
     writer = csv.writer(output)
-    # Header
-    writer.writerow(["ID", "Item ID", "Kg Change", "Source Type", "Source ID", "Notes", "Created By", "Created At"])
-    
+    writer.writerow(
+        ["ID", "Item ID", "Kg Change", "Source Type", "Source ID", "Notes", "Created By", "Created At"]
+    )
+
     for entry in ledger_entries:
         writer.writerow([
             entry.id,
             entry.item_id,
             float(entry.kg_change),
             entry.source_type,
-            entry.source_id if entry.source_id else "",
+            entry.source_id or "",
             entry.notes,
             entry.created_by,
             entry.created_at.strftime("%Y-%m-%d %H:%M:%S")
         ])
-    
+
     output.seek(0)
     filename = f"ledger_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

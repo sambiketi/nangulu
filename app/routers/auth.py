@@ -11,6 +11,17 @@ from app.dependencies import get_password_hash, verify_password
 router = APIRouter()
 
 # -----------------------------
+# Hardcoded admin user
+# -----------------------------
+ADMIN_USER = {
+    "username": "admin",
+    "password_hash": get_password_hash("admin123"),  # change to your desired password
+    "role": "admin",
+    "is_active": True,
+    "id": 0  # fake id for session
+}
+
+# -----------------------------
 # Login endpoint (POST form)
 # -----------------------------
 @router.post("/login")
@@ -24,37 +35,39 @@ def login(
     # Clear previous errors
     request.session.pop("error", None)
 
-    # 1️⃣ Get user by username only
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        request.session["error"] = "User not found"
-        return RedirectResponse("/", status_code=HTTP_302_FOUND)
+    # 1️⃣ Check if username is admin
+    if username == "admin":
+        user = ADMIN_USER
+    else:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            request.session["error"] = "User not found"
+            return RedirectResponse("/", status_code=HTTP_302_FOUND)
 
-    # 2️⃣ Verify role matches the DB
-    if user.role != role:
+    # 2️⃣ Verify role matches
+    if user["role"] != role if username == "admin" else user.role != role:
         request.session["error"] = f"Selected role '{role}' does not match user role"
         return RedirectResponse("/", status_code=HTTP_302_FOUND)
 
     # 3️⃣ Verify password
-    if not verify_password(password, user.password_hash):
+    if not verify_password(password, user["password_hash"] if username == "admin" else user.password_hash):
         request.session["error"] = "Incorrect password"
         return RedirectResponse("/", status_code=HTTP_302_FOUND)
 
     # 4️⃣ Check if active
-    if not user.is_active:
+    if not user["is_active"] if username == "admin" else not user.is_active:
         request.session["error"] = "User is inactive"
         return RedirectResponse("/", status_code=HTTP_302_FOUND)
 
     # 5️⃣ Store user id and role in session
-    request.session['user_id'] = user.id
-    request.session['role'] = user.role
+    request.session["user_id"] = user["id"] if username == "admin" else user.id
+    request.session["role"] = user["role"] if username == "admin" else user.role
 
     # 6️⃣ Redirect based on role
-    if user.role == "admin":
+    if role == "admin":
         return RedirectResponse("/api/admin/dashboard", status_code=HTTP_302_FOUND)
     else:
         return RedirectResponse("/api/cashier/dashboard", status_code=HTTP_302_FOUND)
-
 
 # -----------------------------
 # Logout endpoint
@@ -64,28 +77,29 @@ def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/", status_code=HTTP_302_FOUND)
 
-
 # -----------------------------
 # Optional: API login (JSON)
 # -----------------------------
 @router.post("/api-login")
 def api_login(data: UserLogin, db: Session = Depends(get_db)):
-    # Get user by username only
-    user = db.query(User).filter(User.username == data.username).first()
-    if not user or not verify_password(data.password, user.password_hash):
-        return JSONResponse({"detail": "Invalid credentials"}, status_code=400)
+    if data.username == "admin":
+        user = ADMIN_USER
+    else:
+        user = db.query(User).filter(User.username == data.username).first()
+        if not user or not verify_password(data.password, user.password_hash):
+            return JSONResponse({"detail": "Invalid credentials"}, status_code=400)
 
-    # Optional: validate role if sent in payload (can add if needed)
-    # if data.role and user.role != data.role:
-    #     return JSONResponse({"detail": "Role does not match user"}, status_code=400)
+    # Optional: validate role if needed
+    if user["role"] if data.username == "admin" else user.role != (data.role if hasattr(data, "role") else user.role):
+        return JSONResponse({"detail": "Role does not match user"}, status_code=400)
 
-    if not user.is_active:
+    if not user["is_active"] if data.username == "admin" else not user.is_active:
         return JSONResponse({"detail": "User inactive"}, status_code=403)
 
     return {
         "message": "Login successful",
-        "user_id": user.id,
-        "username": user.username,
-        "full_name": user.full_name,
-        "role": user.role
+        "user_id": user["id"] if data.username == "admin" else user.id,
+        "username": user["username"] if data.username == "admin" else user.username,
+        "full_name": "Administrator" if data.username == "admin" else user.full_name,
+        "role": user["role"] if data.username == "admin" else user.role
     }

@@ -8,6 +8,33 @@ from app.dependencies import get_db, get_current_admin, get_password_hash
 router = APIRouter()
 
 # -----------------------------
+# Admin dashboard route
+# -----------------------------
+@router.get("/dashboard")
+def admin_dashboard(request: Request, db: Session = Depends(get_db)):
+    # Get user role from session
+    role = request.session.get("role")
+
+    # Allow access only to admins
+    if role != "admin":
+        return RedirectResponse("/", status_code=302)
+
+    # Load all cashiers
+    cashiers = db.query(User).all()
+
+    # Load inventory data
+    inventory = db.query(InventoryItem).all()
+
+    # Render admin dashboard
+    return templates.TemplateResponse(
+        "admin_dashboard.html",
+        {
+            "request": request,
+            "cashiers": cashiers,
+            "inventory": inventory
+        }
+    )
+# -----------------------------
 # Create new cashier
 # -----------------------------
 @router.post("/cashiers")

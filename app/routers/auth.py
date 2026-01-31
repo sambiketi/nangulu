@@ -1,57 +1,71 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Form, Request, Depends
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
+from starlette.status import HTTP_302_FOUND
+
 from app.database import get_db
-from app import models, schemas
+from app.models import User
+from app.schemas import UserLogin
 from app.dependencies import get_password_hash, verify_password
 
 router = APIRouter()
 
-def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(models.User).filter(models.User.username == username).first()
-    if not user:
-        return False
-    if not verify_password(password, user.password_hash):
-        return False
-    if not user.is_active:
-        return False
-    return user
-
-@router.post("/login", response_model=schemas.LoginResponse)
-async def login(
+# -----------------------------
+# Login endpoint (POST form)
+# -----------------------------
+@router.post("/login")
+def login(
     request: Request,
-    user_data: schemas.UserLogin,
+    username: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    user = authenticate_user(db, user_data.username, user_data.password)
+    # Find user by username and role
+    user = db.query(User).filter(User.username == username, User.role == role).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
-        )
-    
-    # Store in session
-    request.session["user_id"] = user.id
-    request.session["username"] = user.username
-    request.session["role"] = user.role
-    request.session["full_name"] = user.full_name
-    
-    # Determine redirect URL
+        return JSONResponse({"detail": "User not found"}, status_code=400)
+
+    if not verify_password(password, user.password_hash):
+        return JSONResponse({"detail": "Incorrect password"}, status_code=400)
+
+    if not user.is_active:
+        return JSONResponse({"detail": "User is inactive"}, status_code=403)
+
+    # Store user id and role in session
+    request.session['user_id'] = user.id
+    request.session['role'] = user.role
+
+    # Redirect based on role
     if user.role == "admin":
-        redirect_url = "/static/templates/admin.html"
+        return RedirectResponse("/api/admin/dashboard", status_code=HTTP_302_FOUND)
     else:
-        cashier_number = "cashier1" if user.id % 2 == 1 else "cashier2"
-        redirect_url = f"/static/templates/{cashier_number}.html"
-    
+        return RedirectResponse("/api/cashier/dashboard", status_code=HTTP_302_FOUND)
+
+
+# -----------------------------
+# Logout endpoint
+# -----------------------------
+@router.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=HTTP_302_FOUND)
+
+
+# -----------------------------
+# Optional: API login (JSON)
+# -----------------------------
+@router.post("/api-login")
+def api_login(data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == data.username).first()
+    if not user or not verify_password(data.password, user.password_hash):
+        return JSONResponse({"detail": "Invalid credentials"}, status_code=400)
+    if not user.is_active:
+        return JSONResponse({"detail": "User inactive"}, status_code=403)
     return {
         "message": "Login successful",
         "user_id": user.id,
         "username": user.username,
         "full_name": user.full_name,
-        "role": user.role,
-        "redirect_to": redirect_url
+        "role": user.role
     }
-
-@router.post("/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return {"message": "Logged out successfully"}

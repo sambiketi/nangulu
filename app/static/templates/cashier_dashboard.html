@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cashier Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/dashboard.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Cashier Dashboard</h1>
+
+    <h2>Inventory</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Name</th><th>Price/Kg</th><th>Stock</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for item in inventory %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.current_price_per_kg }}</td>
+                <td>{{ item.low_stock_level }}</td>
+                <td>
+                    <button onclick="confirmSale({{ item.id }})">Confirm Sale</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Sales</h2>
+    <table>
+        <thead>
+            <tr><th>Sale #</th><th>Item</th><th>Kg Sold</th><th>Total</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.sale_number }}</td>
+                <td>{{ sale.item_name }}</td>
+                <td>{{ sale.kg_sold }}</td>
+                <td>{{ sale.total_price }}</td>
+                <td>{{ sale.status }}</td>
+                <td>
+                    {% if sale.status == "ACTIVE" %}
+                    <button onclick="reverseSale({{ sale.id }})">Reverse</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

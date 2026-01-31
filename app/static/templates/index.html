@@ -4,11 +4,27 @@
     <meta charset="UTF-8">
     <title>Nangulu POS - Login</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .error {
+            color: #fff;
+            background-color: #e74c3c;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
 <div class="container">
     <h1>Nangulu POS</h1>
     <h2>Login</h2>
+
+    <!-- Display error from session -->
+    {% if request.session.error %}
+        <div class="error">{{ request.session.error }}</div>
+        {% do request.session.pop('error') %}
+    {% endif %}
+
     <form method="POST" action="/api/auth/login">
         <label>Username:</label><br>
         <input type="text" name="username" required><br>

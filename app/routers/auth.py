@@ -15,12 +15,17 @@ router = APIRouter()
 # -----------------------------
 ADMIN_USER = {
     "username": "admin",
-    "password_hash": get_password_hash("admin123"[:72]),  # truncate to 72 chars for bcrypt
+    "password_plain": "admin123",  # store plain password, hash at runtime
     "role": "admin",
     "is_active": True,
     "full_name": "Super Admin",
     "id": 0  # special in-memory ID
 }
+
+def get_admin_hash():
+    # Hash at runtime, truncate to 72 chars to avoid bcrypt issue
+    return get_password_hash(ADMIN_USER["password_plain"][:72])
+
 
 # -----------------------------
 # Login endpoint (POST form)
@@ -38,7 +43,7 @@ def login(
 
     # 1️⃣ Check if admin
     if username == ADMIN_USER["username"] and role == ADMIN_USER["role"]:
-        if not verify_password(password, ADMIN_USER["password_hash"]):
+        if not verify_password(password, get_admin_hash()):
             request.session["error"] = "Incorrect password"
             return RedirectResponse("/", status_code=HTTP_302_FOUND)
         # store session
@@ -91,7 +96,7 @@ def logout(request: Request):
 def api_login(data: UserLogin, db: Session = Depends(get_db)):
     # Admin check
     if data.username == ADMIN_USER["username"] and data.role == ADMIN_USER["role"]:
-        if not verify_password(data.password, ADMIN_USER["password_hash"]):
+        if not verify_password(data.password, get_admin_hash()):
             return JSONResponse({"detail": "Incorrect password"}, status_code=400)
         return {
             "message": "Login successful",

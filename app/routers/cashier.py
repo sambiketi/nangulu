@@ -99,21 +99,21 @@ def reverse_sale(sale_id: int, db: Session = Depends(get_db), cashier=Depends(ge
     if not sale or sale.status != "ACTIVE":
         raise HTTPException(404, "Sale not found or already reversed")
 
-        sale.status = "REVERSED"
+    sale.status = "REVERSED"
 
-        # Return kg to inventory ledger
-        ledger = InventoryLedger(
-            item_id=sale.item_id,
-            kg_change=sale.kg_sold,
-            source_type="SALE_REVERSAL",
-            created_by=cashier.id,
-            notes=f"Sale reversed: {sale.sale_number}"
-        )
-        db.add(ledger)
-        db.commit()
+    # Return kg to inventory ledger
+    ledger = InventoryLedger(
+        item_id=sale.item_id,
+        kg_change=sale.kg_sold,
+        source_type="SALE_REVERSAL",
+        created_by=cashier.id,
+        notes=f"Sale reversed: {sale.sale_number}"
+    )
+    db.add(ledger)
+    db.commit()
 
-        return {
-            "id": sale.id,
-            "sale_number": sale.sale_number,
-            "status": sale.status
-        }
+    return {
+        "id": sale.id,
+        "sale_number": sale.sale_number,
+        "status": sale.status
+    }

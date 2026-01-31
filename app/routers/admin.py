@@ -6,8 +6,9 @@ from app.models import User, InventoryItem, InventoryLedger
 from app.schemas import UserCreate
 from app.dependencies import get_db, get_current_admin, get_password_hash
 
-# IMPORTANT: import templates from main
-from app.main import templates
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="app/static/templates")
 
 router = APIRouter()
 

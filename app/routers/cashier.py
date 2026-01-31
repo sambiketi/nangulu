@@ -6,8 +6,9 @@ from app.dependencies import get_db, get_current_cashier
 from decimal import Decimal, ROUND_UP
 import uuid
 
-# Import templates from main.py
-from app.main import templates
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="app/static/templates")
 
 router = APIRouter()
 

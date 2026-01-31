@@ -1,31 +1,32 @@
+# app/routers/auth.py
 from fastapi import APIRouter, Form, Request, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_302_FOUND
+import bcrypt
 
 from app.database import get_db
 from app.models import User
 from app.schemas import UserLogin
-from app.dependencies import get_password_hash, verify_password
+from app.dependencies import verify_password
 
 router = APIRouter()
 
 # -----------------------------
-# Admin stored in memory
+# In-memory admin
 # -----------------------------
+ADMIN_PASSWORD = "admin123"
+# precompute hash once (bcrypt accepts max 72 bytes)
+ADMIN_PASSWORD_HASH = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8')[:72], bcrypt.gensalt())
+
 ADMIN_USER = {
+    "id": 0,
     "username": "admin",
-    "password_plain": "admin123",  # store plain password, hash at runtime
+    "password_hash": ADMIN_PASSWORD_HASH,
     "role": "admin",
     "is_active": True,
-    "full_name": "Super Admin",
-    "id": 0  # special in-memory ID
+    "full_name": "Super Admin"
 }
-
-def get_admin_hash():
-    # Hash at runtime, truncate to 72 chars to avoid bcrypt issue
-    return get_password_hash(ADMIN_USER["password_plain"][:72])
-
 
 # -----------------------------
 # Login endpoint (POST form)
@@ -43,7 +44,7 @@ def login(
 
     # 1️⃣ Check if admin
     if username == ADMIN_USER["username"] and role == ADMIN_USER["role"]:
-        if not verify_password(password, get_admin_hash()):
+        if not bcrypt.checkpw(password.encode('utf-8')[:72], ADMIN_USER["password_hash"]):
             request.session["error"] = "Incorrect password"
             return RedirectResponse("/", status_code=HTTP_302_FOUND)
         # store session
@@ -79,7 +80,6 @@ def login(
     else:
         return RedirectResponse("/api/cashier/dashboard", status_code=HTTP_302_FOUND)
 
-
 # -----------------------------
 # Logout endpoint
 # -----------------------------
@@ -96,7 +96,7 @@ def logout(request: Request):
 def api_login(data: UserLogin, db: Session = Depends(get_db)):
     # Admin check
     if data.username == ADMIN_USER["username"] and data.role == ADMIN_USER["role"]:
-        if not verify_password(data.password, get_admin_hash()):
+        if not bcrypt.checkpw(data.password.encode('utf-8')[:72], ADMIN_USER["password_hash"]):
             return JSONResponse({"detail": "Incorrect password"}, status_code=400)
         return {
             "message": "Login successful",

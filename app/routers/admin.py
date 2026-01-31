@@ -4,26 +4,38 @@ from sqlalchemy.orm import Session
 from io import StringIO
 import csv
 from datetime import datetime
+import bcrypt
 
 from app.models import User, InventoryItem, InventoryLedger
 from app.schemas import UserCreate
-from app.dependencies import get_db, get_password_hash
+from app.dependencies import get_db
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="app/static/templates")
 router = APIRouter()
 
 # -----------------------------
-# In-memory admin
+# In-memory admin with lazy password hashing
 # -----------------------------
 ADMIN_USER = {
     "id": 0,
     "username": "admin",
-    "password_hash": get_password_hash("admin123"[:72]),  # truncate for bcrypt
+    "_password_plain": "admin123",  # store plain temporarily
+    "password_hash": None,          # hashed on first use
     "role": "admin",
     "is_active": True,
     "full_name": "Super Admin"
 }
+
+def get_admin_password_hash():
+    """Compute and cache admin password hash on first use."""
+    if ADMIN_USER["password_hash"] is None:
+        # bcrypt max 72 bytes
+        ADMIN_USER["password_hash"] = bcrypt.hashpw(
+            ADMIN_USER["_password_plain"].encode('utf-8')[:72],
+            bcrypt.gensalt()
+        )
+    return ADMIN_USER["password_hash"]
 
 # -----------------------------
 # Admin dashboard route
@@ -62,7 +74,7 @@ def create_cashier(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, "Role must be cashier")
     if db.query(User).filter(User.username == user.username).first():
         raise HTTPException(400, "Username exists")
-    hashed_password = get_password_hash(user.password)
+    hashed_password = bcrypt.hashpw(user.password.encode('utf-8')[:72], bcrypt.gensalt())
     new_user = User(
         username=user.username,
         full_name=user.full_name,

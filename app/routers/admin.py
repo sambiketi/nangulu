@@ -1,36 +1,49 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
+from io import StringIO
+import csv
+from datetime import datetime
 
 from app.models import User, InventoryItem, InventoryLedger
 from app.schemas import UserCreate
-from app.dependencies import get_db, get_current_admin, get_password_hash
-
+from app.dependencies import get_db, get_password_hash
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="app/static/templates")
-
 router = APIRouter()
+
+# -----------------------------
+# In-memory admin
+# -----------------------------
+ADMIN_USER = {
+    "id": 0,
+    "username": "admin",
+    "password_hash": get_password_hash("admin123"[:72]),  # truncate for bcrypt
+    "role": "admin",
+    "is_active": True,
+    "full_name": "Super Admin"
+}
 
 # -----------------------------
 # Admin dashboard route
 # -----------------------------
 @router.get("/dashboard")
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    # Get user role from session
     role = request.session.get("role")
+    user_id = request.session.get("user_id")
 
-    # Allow access only to admins
-    if role != "admin":
+    # Only allow the in-memory admin
+    if role != "admin" or user_id != ADMIN_USER["id"]:
         return RedirectResponse("/", status_code=302)
 
-    # Load all cashiers
-    cashiers = db.query(User).all()
+    # Load all cashiers from DB
+    cashiers = db.query(User).filter(User.role == "cashier").all()
 
     # Load inventory data
     inventory = db.query(InventoryItem).all()
 
-    # Render admin dashboard
+    # Render template
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
@@ -44,7 +57,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
 # Create new cashier
 # -----------------------------
 @router.post("/cashiers")
-def create_cashier(user: UserCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def create_cashier(user: UserCreate, db: Session = Depends(get_db)):
     if user.role != "cashier":
         raise HTTPException(400, "Role must be cashier")
     if db.query(User).filter(User.username == user.username).first():
@@ -62,10 +75,10 @@ def create_cashier(user: UserCreate, db: Session = Depends(get_db), admin=Depend
     return {"id": new_user.id, "username": new_user.username}
 
 # -----------------------------
-# Deactivate cashier (data stays)
+# Deactivate cashier
 # -----------------------------
 @router.delete("/cashiers/{cashier_id}")
-def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db)):
     user = db.query(User).get(cashier_id)
     if not user or user.role != "cashier":
         raise HTTPException(404, "Cashier not found")
@@ -83,8 +96,7 @@ def add_purchase(
     description: str = None,
     kg_added: float = None,
     purchase_price_per_kg: float = None,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
+    db: Session = Depends(get_db)
 ):
     if kg_added <= 0 or purchase_price_per_kg <= 0:
         raise HTTPException(400, "Invalid kg or price")
@@ -109,8 +121,8 @@ def add_purchase(
         item_id=item.id,
         kg_change=kg_added,
         source_type="PURCHASE",
-        created_by=admin.id,
-        notes=f"Purchase added by admin {admin.username}"
+        created_by=ADMIN_USER["id"],
+        notes=f"Purchase added by admin {ADMIN_USER['username']}"
     )
     db.add(ledger)
     db.commit()
@@ -124,8 +136,7 @@ def add_purchase(
 def set_selling_price(
     item_id: int,
     price: float = Query(..., gt=0),
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
+    db: Session = Depends(get_db)
 ):
     item = db.query(InventoryItem).get(item_id)
     if not item:
@@ -137,13 +148,8 @@ def set_selling_price(
 # -----------------------------
 # Download Inventory Ledger
 # -----------------------------
-import csv
-from fastapi.responses import StreamingResponse
-from io import StringIO
-from datetime import datetime
-
 @router.get("/ledger/download")
-def download_ledger(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def download_ledger(db: Session = Depends(get_db)):
     ledger_entries = db.query(InventoryLedger).order_by(
         InventoryLedger.created_at.desc()
     ).all()

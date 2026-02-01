@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 # -----------------------------
 SQLALCHEMY_DATABASE_URL = os.environ.get(
     "SQLALCHEMY_DATABASE_URL",
-    "postgresql://postgres.fsgeorfboljqcnpchvyj:sanko3217anko@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
+    "postgresql+psycopg://postgres.fsgeorfboljqcnpchvyj:sanko3217anko@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
 )
 
 # -----------------------------

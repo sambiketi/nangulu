@@ -1,10 +1,10 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import OperationalError
 
 # -----------------------------
-# Pull connection string from environment variable
+# Database URL (from Render env)
 # -----------------------------
 SQLALCHEMY_DATABASE_URL = os.environ.get(
     "SQLALCHEMY_DATABASE_URL",
@@ -12,26 +12,30 @@ SQLALCHEMY_DATABASE_URL = os.environ.get(
 )
 
 # -----------------------------
-# Create engine
+# Create engine (SQLAlchemy 2.0)
 # -----------------------------
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,
-    future=True  # SQLAlchemy 2.0 style
+    future=True
 )
 
 # -----------------------------
-# Create session
+# Session factory
 # -----------------------------
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
 # -----------------------------
-# Base class for models
+# Base model
 # -----------------------------
 Base = declarative_base()
 
 # -----------------------------
-# Dependency for FastAPI
+# FastAPI dependency
 # -----------------------------
 def get_db():
     db = SessionLocal()
@@ -41,15 +45,15 @@ def get_db():
         db.close()
 
 # -----------------------------
-# Optional: quick test if DB is reachable
+# Optional DB connection test
 # -----------------------------
 def test_connection():
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1;")
+            conn.execute(text("SELECT 1"))
         print("✅ Database connection successful")
     except OperationalError as e:
         print("❌ Database connection failed:", e)
 
-# Run test on import (optional)
+# ⚠️ TEMPORARY: comment out after first successful boot
 test_connection()

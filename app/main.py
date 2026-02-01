@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy.orm import Session
 
 from app.routers import auth, admin, cashier
-from app.database import Base, engine
+from app.database import Base, engine, get_db
 
 # -----------------------------
 # Create all tables if not exist
@@ -52,3 +53,31 @@ def root(request: Request):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# -----------------------------
+# DB connection check
+# -----------------------------
+@app.get("/db-check")
+def db_check(db: Session = Depends(get_db)):
+    """
+    Verify that FastAPI can connect to the database.
+    Returns counts from key tables if successful.
+    """
+    try:
+        users_count = db.execute("SELECT COUNT(*) FROM users").scalar()
+        inventory_count = db.execute("SELECT COUNT(*) FROM inventory_items").scalar()
+        sales_count = db.execute("SELECT COUNT(*) FROM sales").scalar()
+
+        return {
+            "status": "ok",
+            "db_connected": True,
+            "users_count": users_count,
+            "inventory_count": inventory_count,
+            "sales_count": sales_count
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "db_connected": False,
+            "error": str(e)
+        }

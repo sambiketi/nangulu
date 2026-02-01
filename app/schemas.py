@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 from decimal import Decimal
 
@@ -9,7 +9,7 @@ from decimal import Decimal
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     full_name: str = Field(..., min_length=2, max_length=100)
-    role: str = Field(..., regex="^(admin|cashier)$")
+    role: str = Field(..., pattern="^(admin|cashier)$")  # <-- changed from regex
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
@@ -17,7 +17,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     password: Optional[str] = None
-    role: Optional[str] = Field(None, regex="^(admin|cashier)$")
+    role: Optional[str] = Field(None, pattern="^(admin|cashier)$")  # <-- changed
     is_active: Optional[bool] = None
 
 class UserResponse(UserBase):
@@ -65,7 +65,7 @@ class InventoryItemResponse(InventoryItemBase):
 class SaleCreate(BaseModel):
     item_id: int
     kg_sold: Decimal = Field(..., gt=0)
-    payment_type: str = Field(..., regex="^(Cash|Mpesa)$")
+    payment_type: str = Field(..., pattern="^(Cash|Mpesa)$")  # <-- changed from regex
     customer_name: Optional[str] = None
 
 class SaleResponse(BaseModel):

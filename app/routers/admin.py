@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="app/static/templates")
 router = APIRouter()
 
+
 # -----------------------------
 # In-memory admin with lazy password hashing
 # -----------------------------
@@ -30,32 +31,32 @@ ADMIN_USER = {
 def get_admin_password_hash():
     """Compute and cache admin password hash on first use."""
     if ADMIN_USER["password_hash"] is None:
-        # bcrypt max 72 bytes
         ADMIN_USER["password_hash"] = bcrypt.hashpw(
             ADMIN_USER["_password_plain"].encode('utf-8')[:72],
             bcrypt.gensalt()
         )
     return ADMIN_USER["password_hash"]
 
+
 # -----------------------------
 # Admin dashboard route
 # -----------------------------
 @router.get("/dashboard")
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
+    """
+    Load Admin Dashboard:
+    - All cashiers
+    - Full inventory
+    """
     role = request.session.get("role")
     user_id = request.session.get("user_id")
 
-    # Only allow the in-memory admin
     if role != "admin" or user_id != ADMIN_USER["id"]:
         return RedirectResponse("/", status_code=302)
 
-    # Load all cashiers from DB
     cashiers = db.query(User).filter(User.role == "cashier").all()
-
-    # Load inventory data
     inventory = db.query(InventoryItem).all()
 
-    # Render template
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
@@ -65,38 +66,50 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         }
     )
 
+
 # -----------------------------
 # Create new cashier
 # -----------------------------
 @router.post("/cashiers")
 def create_cashier(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    Create a new cashier:
+    - Role must be 'cashier'
+    - Username must be unique
+    """
     if user.role != "cashier":
         raise HTTPException(400, "Role must be cashier")
+
     if db.query(User).filter(User.username == user.username).first():
         raise HTTPException(400, "Username exists")
+
     hashed_password = bcrypt.hashpw(user.password.encode('utf-8')[:72], bcrypt.gensalt())
     new_user = User(
         username=user.username,
         full_name=user.full_name,
         role="cashier",
-        password_hash=hashed_password
+        password_hash=hashed_password,
+        is_active=True
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"id": new_user.id, "username": new_user.username}
+
+    return {"id": new_user.id, "username": new_user.username, "full_name": new_user.full_name}
+
 
 # -----------------------------
 # Deactivate cashier
 # -----------------------------
 @router.delete("/cashiers/{cashier_id}")
 def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).get(cashier_id)
-    if not user or user.role != "cashier":
+    user = db.query(User).filter(User.id == cashier_id, User.role == "cashier").first()
+    if not user:
         raise HTTPException(404, "Cashier not found")
     user.is_active = False
     db.commit()
-    return {"id": user.id, "username": user.username}
+    return {"id": user.id, "username": user.username, "is_active": user.is_active}
+
 
 # -----------------------------
 # Add purchase / add stock
@@ -110,36 +123,50 @@ def add_purchase(
     purchase_price_per_kg: float = None,
     db: Session = Depends(get_db)
 ):
-    if kg_added <= 0 or purchase_price_per_kg <= 0:
+    """
+    Add stock to existing item or create new item
+    """
+    if kg_added is None or kg_added <= 0 or purchase_price_per_kg is None or purchase_price_per_kg <= 0:
         raise HTTPException(400, "Invalid kg or price")
 
     if item_id:
-        item = db.query(InventoryItem).get(item_id)
+        item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
         if not item:
             raise HTTPException(404, "Item not found")
+        # Update price per kg if needed
         item.current_price_per_kg = purchase_price_per_kg
         db.add(item)
     else:
+        # Create new inventory item
         item = InventoryItem(
             name=name,
             description=description,
-            current_price_per_kg=purchase_price_per_kg
+            current_price_per_kg=purchase_price_per_kg,
+            quantity_available=0,
+            is_active=True
         )
         db.add(item)
         db.commit()
         db.refresh(item)
 
+    # Add ledger entry
     ledger = InventoryLedger(
         item_id=item.id,
         kg_change=kg_added,
         source_type="PURCHASE",
+        source_id=None,
         created_by=ADMIN_USER["id"],
         notes=f"Purchase added by admin {ADMIN_USER['username']}"
     )
     db.add(ledger)
+
+    # Update actual quantity
+    item.quantity_available += kg_added
+
     db.commit()
     db.refresh(ledger)
-    return {"id": ledger.id, "item_id": item.id}
+    return {"id": ledger.id, "item_id": item.id, "kg_added": kg_added}
+
 
 # -----------------------------
 # Set selling price
@@ -150,21 +177,26 @@ def set_selling_price(
     price: float = Query(..., gt=0),
     db: Session = Depends(get_db)
 ):
-    item = db.query(InventoryItem).get(item_id)
+    """
+    Update selling price per kg
+    """
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
     item.current_price_per_kg = price
     db.commit()
     return {"id": item.id, "new_price": item.current_price_per_kg}
 
+
 # -----------------------------
 # Download Inventory Ledger
 # -----------------------------
 @router.get("/ledger/download")
 def download_ledger(db: Session = Depends(get_db)):
-    ledger_entries = db.query(InventoryLedger).order_by(
-        InventoryLedger.created_at.desc()
-    ).all()
+    """
+    Download full inventory ledger as CSV
+    """
+    ledger_entries = db.query(InventoryLedger).order_by(InventoryLedger.created_at.desc()).all()
 
     output = StringIO()
     writer = csv.writer(output)

@@ -4,54 +4,78 @@
     <meta charset="UTF-8">
     <title>Cashier Dashboard</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/cashier_dashboard.js" defer></script>
 </head>
 <body>
 <div class="container">
     <h1>Cashier Dashboard</h1>
 
-    <h2>Inventory</h2>
-    <table>
-        <thead>
-            <tr><th>ID</th><th>Name</th><th>Price/Kg</th><th>Stock</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-            {% for item in inventory %}
-            <tr>
-                <td>{{ item.id }}</td>
-                <td>{{ item.name }}</td>
-                <td>{{ item.current_price_per_kg }}</td>
-                <td>{{ item.low_stock_level }}</td>
-                <td>
-                    <button onclick="confirmSale({{ item.id }})">Confirm Sale</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- ---------------- New Sale Form ---------------- -->
+    <section>
+        <h2>New Sale</h2>
+        <form id="sale-form">
+            <label for="item">Select Item:</label>
+            <select id="item" name="item_id" required>
+                {% for item in inventory %}
+                <option value="{{ item.id }}" data-price="{{ item.current_price_per_kg }}">
+                    {{ item.name }}
+                </option>
+                {% endfor %}
+            </select>
 
-    <h2>Sales</h2>
-    <table>
-        <thead>
-            <tr><th>Sale #</th><th>Item</th><th>Kg Sold</th><th>Total</th><th>Status</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-            {% for sale in sales %}
-            <tr>
-                <td>{{ sale.sale_number }}</td>
-                <td>{{ sale.item_name }}</td>
-                <td>{{ sale.kg_sold }}</td>
-                <td>{{ sale.total_price }}</td>
-                <td>{{ sale.status }}</td>
-                <td>
-                    {% if sale.status == "ACTIVE" %}
-                    <button onclick="reverseSale({{ sale.id }})">Reverse</button>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <label for="kg_sold">Kg Sold:</label>
+            <input type="number" step="0.001" id="kg_sold" name="kg_sold" required>
+
+            <label for="payment_type">Payment Type:</label>
+            <select id="payment_type" name="payment_type" required>
+                <option value="Cash">Cash</option>
+                <option value="Mpesa">Mpesa</option>
+            </select>
+
+            <label for="customer_name">Customer Name (optional):</label>
+            <input type="text" id="customer_name" name="customer_name">
+
+            <p>Price per kg: <span id="price_per_kg">0.00</span></p>
+            <p>Total price: <span id="total_price">0.00</span></p>
+
+            <button type="submit">Complete Sale</button>
+        </form>
+    </section>
+
+    <!-- ---------------- Stock Overview ---------------- -->
+    <section>
+        <h2>Inventory Stock</h2>
+        <table border="1">
+            <thead>
+                <tr><th>Item</th><th>Available (kg)</th><th>Price/Kg</th></tr>
+            </thead>
+            <tbody>
+                {% for item in inventory %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.quantity_available }}</td>
+                    <td>{{ item.current_price_per_kg }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ---------------- Recent Sales ---------------- -->
+    <section>
+        <h2>Recent Sales</h2>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Sale #</th><th>Item</th><th>Kg Sold</th>
+                    <th>Total Price</th><th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="recent-sales">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </section>
 </div>
 </body>
 </html>

@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const resp = await fetch('/cashier/sales', {
+            const resp = await fetch('/api/cashier/sales', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function loadRecentSales() {
-        const resp = await fetch('/cashier/sales/recent');
+        const resp = await fetch('/api/cashier/sales/recent');
         if (!resp.ok) return;
 
         const sales = await resp.json();

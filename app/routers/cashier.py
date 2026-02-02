@@ -13,7 +13,7 @@ router = APIRouter()
 # In-memory cashiers for testing (plain text passwords)
 IN_MEMORY_CASHIERS = {
     "cashier1": {
-        "id": -1,  # Negative ID to avoid conflict with database
+        "id": 2,  # Negative ID to avoid conflict with database
         "username": "cashier1",
         "password": "cashier123",  # Plain text
         "role": "cashier",
@@ -21,7 +21,7 @@ IN_MEMORY_CASHIERS = {
         "full_name": "Cashier One"
     },
     "cashier2": {
-        "id": -2,
+        "id": 3,
         "username": "cashier2", 
         "password": "cashier123",  # Plain text
         "role": "cashier",
@@ -41,16 +41,25 @@ class SaleCreate(BaseModel):
 
 
 # -----------------------------
-# Cashier login
-# -----------------------------
-
-@router.post("/login")
+#@router.post("/login")
 def cashier_login(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    # First check in-memory cashiers
+    if username in IN_MEMORY_CASHIERS:
+        cashier = IN_MEMORY_CASHIERS[username]
+        if password == cashier["password"]:  # Plain text comparison
+            request.session["user_id"] = cashier["id"]
+            request.session["role"] = cashier["role"]
+            return RedirectResponse("/api/cashier/dashboard", status_code=302)
+        else:
+            request.session["error"] = "Invalid password"
+            return RedirectResponse("/", status_code=302)
+    
+    # If not in memory, check database
     user = db.query(User).filter(User.username == username, User.role == "cashier").first()
     if not user:
         request.session["error"] = "Invalid username"
@@ -64,8 +73,6 @@ def cashier_login(
     request.session["user_id"] = user.id
     request.session["role"] = user.role
     return RedirectResponse("/api/cashier/dashboard", status_code=302)
-
-
 # -----------------------------
 # Cashier dashboard
 # -----------------------------

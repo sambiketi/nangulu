@@ -44,7 +44,7 @@ def cashier_login(
 
     request.session["user_id"] = user.id
     request.session["role"] = user.role
-    return RedirectResponse("/cashier/dashboard", status_code=302)
+    return RedirectResponse("/api/cashier/dashboard", status_code=302)
 
 
 # -----------------------------

@@ -87,7 +87,7 @@
             {% if error and error_role == 'cashier' %}
                 <div class="error">{{ error }}</div>
             {% endif %}
-            <form method="POST" action="/cashier/login">
+            <form method="POST" action="/api/cashier/login">
                 <label>Username:</label>
                 <input type="text" name="username" required>
                 <label>Password:</label>

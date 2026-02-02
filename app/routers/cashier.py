@@ -10,7 +10,25 @@ from pydantic import BaseModel
 
 templates = Jinja2Templates(directory="app/static/templates")
 router = APIRouter()
-
+# In-memory cashiers for testing (plain text passwords)
+IN_MEMORY_CASHIERS = {
+    "cashier1": {
+        "id": -1,  # Negative ID to avoid conflict with database
+        "username": "cashier1",
+        "password": "cashier123",  # Plain text
+        "role": "cashier",
+        "is_active": True,
+        "full_name": "Cashier One"
+    },
+    "cashier2": {
+        "id": -2,
+        "username": "cashier2", 
+        "password": "cashier123",  # Plain text
+        "role": "cashier",
+        "is_active": True,
+        "full_name": "Cashier Two"
+    }
+}
 
 # -----------------------------
 # Request schema
@@ -25,14 +43,7 @@ class SaleCreate(BaseModel):
 # -----------------------------
 # Cashier login
 # -----------------------------
-@router.post("/login")
-def cashier_login(...):
-    print("=" * 50)
-    print("DEBUG: cashier_login called")
-    print(f"DEBUG: username param: {username}")
-    print(f"DEBUG: password param: {password}")
-    print("=" * 50)
-    # ... rest of function
+
 @router.post("/login")
 def cashier_login(
     request: Request,

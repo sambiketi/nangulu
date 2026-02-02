@@ -26,6 +26,14 @@ class SaleCreate(BaseModel):
 # Cashier login
 # -----------------------------
 @router.post("/login")
+def cashier_login(...):
+    print("=" * 50)
+    print("DEBUG: cashier_login called")
+    print(f"DEBUG: username param: {username}")
+    print(f"DEBUG: password param: {password}")
+    print("=" * 50)
+    # ... rest of function
+@router.post("/login")
 def cashier_login(
     request: Request,
     username: str = Form(...),

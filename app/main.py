@@ -16,7 +16,7 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI app
 # -----------------------------
 app = FastAPI(title="Nangulu POS", version="1.0.0")
-app.add_middleware(SessionMiddleware, secret_key="nangulu-secret-key-123456")  # simple session
+app.add_middleware(SessionMiddleware, secret_key="nangulu-secret-key-123456")
 
 # -----------------------------
 # Mount static files
@@ -26,24 +26,25 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # -----------------------------
 # Templates
 # -----------------------------
-templates = Jinja2Templates(directory="app/static/templates")  # must match template folder
+templates = Jinja2Templates(directory="app/static/templates")
 
 # -----------------------------
 # Include routers
 # -----------------------------
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-app.include_router(cashier.router, prefix="/api/cashier", tags=["cashier"])
+
+# 🔧 FIX: expose cashier routes at /cashier (UI-facing)
+app.include_router(cashier.router, prefix="/cashier", tags=["cashier"])
+
+# (keep API version untouched)
+app.include_router(cashier.router, prefix="/api/cashier", tags=["cashier-api"])
 
 # -----------------------------
 # Root login page
 # -----------------------------
 @app.get("/")
 def root(request: Request):
-    """
-    Root login page
-    """
-    # Pop error message from session if it exists
     error = request.session.pop("error", None)
     return templates.TemplateResponse("index.html", {"request": request, "error": error})
 
@@ -59,10 +60,6 @@ def health():
 # -----------------------------
 @app.get("/db-check")
 def db_check(db: Session = Depends(get_db)):
-    """
-    Verify that FastAPI can connect to the database.
-    Returns counts from key tables if successful.
-    """
     try:
         users_count = db.execute("SELECT COUNT(*) FROM users").scalar()
         inventory_count = db.execute("SELECT COUNT(*) FROM inventory_items").scalar()

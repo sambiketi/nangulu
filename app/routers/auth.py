@@ -25,7 +25,7 @@ IN_MEMORY_USERS = {
         "full_name": "Super Admin"
     },
     "cashier1": {
-        "id": -1,
+        "id": 2,
         "username": "cashier1",
         "password": "cashier123",  # Plain text
         "role": "cashier",
@@ -33,7 +33,7 @@ IN_MEMORY_USERS = {
         "full_name": "Cashier One"
     },
     "cashier2": {
-        "id": -2,
+        "id": 3,
         "username": "cashier2",
         "password": "cashier123",  # Plain text
         "role": "cashier",

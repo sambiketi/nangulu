@@ -5,6 +5,40 @@
     <title>Nangulu POS - Login</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f6f6f6;
+        }
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 25px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        form {
+            margin-top: 20px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #27ae60;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #219150;
+        }
         .error {
             color: #fff;
             background-color: #e74c3c;
@@ -12,33 +46,57 @@
             margin-bottom: 15px;
             border-radius: 5px;
         }
+        .forms-wrapper {
+            display: flex;
+            gap: 20px;
+            justify-content: space-between;
+        }
+        .form-box {
+            flex: 1;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>Nangulu POS</h1>
-    <h2>Login</h2>
+    <div class="forms-wrapper">
 
-    <!-- Display error passed from Python -->
-    {% if error %}
-        <div class="error">{{ error }}</div>
-    {% endif %}
+        <!-- Admin Login Form -->
+        <div class="form-box">
+            <h2>Admin Login</h2>
+            {% if error and error_role == 'admin' %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="/api/auth/login">
+                <input type="hidden" name="role" value="admin">
+                <label>Username:</label>
+                <input type="text" name="username" required>
+                <label>Password:</label>
+                <input type="password" name="password" required>
+                <button type="submit">Login as Admin</button>
+            </form>
+        </div>
 
-    <form method="POST" action="/api/auth/login">
-        <label>Username:</label><br>
-        <input type="text" name="username" required><br>
+        <!-- Cashier Login Form -->
+        <div class="form-box">
+            <h2>Cashier Login</h2>
+            {% if error and error_role == 'cashier' %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="/cashier/login">
+                <label>Username:</label>
+                <input type="text" name="username" required>
+                <label>Password:</label>
+                <input type="password" name="password" required>
+                <button type="submit">Login as Cashier</button>
+            </form>
+        </div>
 
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br>
-
-        <label>Role:</label><br>
-        <select name="role">
-            <option value="admin">Admin</option>
-            <option value="cashier">Cashier</option>
-        </select><br><br>
-
-        <button type="submit">Login</button>
-    </form>
+    </div>
 </div>
 </body>
 </html>

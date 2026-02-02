@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.models import Sale, InventoryItem, InventoryLedger, User
 from app.dependencies import get_db, get_current_cashier
@@ -9,7 +9,6 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 templates = Jinja2Templates(directory="app/static/templates")
-
 router = APIRouter()
 
 
@@ -24,13 +23,35 @@ class SaleCreate(BaseModel):
 
 
 # -----------------------------
-# Cashier dashboard route
+# Cashier login
+# -----------------------------
+@router.post("/login")
+def cashier_login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.username == username, User.role == "cashier").first()
+    if not user:
+        request.session["error"] = "Invalid username"
+        return RedirectResponse("/", status_code=302)
+
+    import bcrypt
+    if not bcrypt.checkpw(password.encode("utf-8"), user.password_hash):
+        request.session["error"] = "Invalid password"
+        return RedirectResponse("/", status_code=302)
+
+    request.session["user_id"] = user.id
+    request.session["role"] = user.role
+    return RedirectResponse("/cashier/dashboard", status_code=302)
+
+
+# -----------------------------
+# Cashier dashboard
 # -----------------------------
 @router.get("/dashboard")
 def cashier_dashboard(request: Request, db: Session = Depends(get_db), cashier: User = Depends(get_current_cashier)):
-    if cashier.role != "cashier":
-        return RedirectResponse("/", status_code=302)
-
     inventory = db.query(InventoryItem).filter(InventoryItem.is_active == True).all()
     sales = (
         db.query(Sale)
@@ -39,7 +60,6 @@ def cashier_dashboard(request: Request, db: Session = Depends(get_db), cashier: 
         .limit(20)
         .all()
     )
-
     return templates.TemplateResponse(
         "cashier_dashboard.html",
         {
@@ -67,18 +87,12 @@ def confirm_sale(
 
     if not item:
         raise HTTPException(404, "Item not found")
-
     if sale.kg_sold <= 0:
         raise HTTPException(400, "Invalid kg sold")
-
     if sale.kg_sold > float(item.quantity_available):
         raise HTTPException(400, "Not enough stock")
 
-    total_price = (
-        Decimal(item.current_price_per_kg)
-        * Decimal(sale.kg_sold)
-    ).quantize(0, ROUND_UP)
-
+    total_price = (Decimal(item.current_price_per_kg) * Decimal(sale.kg_sold)).quantize(0, ROUND_UP)
     sale_number = str(uuid.uuid4())[:8].upper()
 
     sale_record = Sale(
@@ -104,7 +118,6 @@ def confirm_sale(
     db.add(ledger)
 
     item.quantity_available -= sale.kg_sold
-
     db.commit()
     db.refresh(sale_record)
 
@@ -128,7 +141,6 @@ def reverse_sale(sale_id: int, db: Session = Depends(get_db), cashier: User = De
         raise HTTPException(404, "Sale not found or already reversed")
 
     sale.status = "REVERSED"
-
     item = db.query(InventoryItem).filter(InventoryItem.id == sale.item_id).first()
     if item:
         item.quantity_available += sale.kg_sold
@@ -142,7 +154,6 @@ def reverse_sale(sale_id: int, db: Session = Depends(get_db), cashier: User = De
         notes=f"Sale reversed: {sale.sale_number}"
     )
     db.add(ledger)
-
     db.commit()
     db.refresh(sale)
 
@@ -154,7 +165,7 @@ def reverse_sale(sale_id: int, db: Session = Depends(get_db), cashier: User = De
 
 
 # -----------------------------
-# Recent sales endpoint for JS
+# Recent sales for JS
 # -----------------------------
 @router.get("/sales/recent")
 def recent_sales(db: Session = Depends(get_db), cashier: User = Depends(get_current_cashier)):
@@ -165,7 +176,6 @@ def recent_sales(db: Session = Depends(get_db), cashier: User = Depends(get_curr
         .limit(20)
         .all()
     )
-
     return [
         {
             "id": sale.id,

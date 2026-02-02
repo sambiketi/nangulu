@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from io import StringIO
@@ -14,22 +14,18 @@ from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="app/static/templates")
 router = APIRouter()
 
-
-# -----------------------------
-# In-memory admin with lazy password hashing
-# -----------------------------
+# In-memory admin
 ADMIN_USER = {
     "id": 0,
     "username": "admin",
-    "_password_plain": "admin123",  # store plain temporarily
-    "password_hash": None,          # hashed on first use
+    "_password_plain": "admin123",
+    "password_hash": None,
     "role": "admin",
     "is_active": True,
     "full_name": "Super Admin"
 }
 
 def get_admin_password_hash():
-    """Compute and cache admin password hash on first use."""
     if ADMIN_USER["password_hash"] is None:
         ADMIN_USER["password_hash"] = bcrypt.hashpw(
             ADMIN_USER["_password_plain"].encode('utf-8')[:72],
@@ -37,17 +33,11 @@ def get_admin_password_hash():
         )
     return ADMIN_USER["password_hash"]
 
-
 # -----------------------------
-# Admin dashboard route
+# Admin dashboard
 # -----------------------------
 @router.get("/dashboard")
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    """
-    Load Admin Dashboard:
-    - All cashiers
-    - Full inventory
-    """
     role = request.session.get("role")
     user_id = request.session.get("user_id")
 
@@ -66,17 +56,29 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         }
     )
 
+# -----------------------------
+# Admin login
+# -----------------------------
+@router.post("/login")
+def login_admin(request: Request, username: str = Query(...), password: str = Query(...)):
+    if username != ADMIN_USER["username"]:
+        request.session["error"] = "Invalid admin username"
+        return RedirectResponse("/", status_code=302)
+
+    if not bcrypt.checkpw(password.encode('utf-8')[:72], get_admin_password_hash()):
+        request.session["error"] = "Invalid admin password"
+        return RedirectResponse("/", status_code=302)
+
+    request.session["user_id"] = ADMIN_USER["id"]
+    request.session["role"] = "admin"
+    return RedirectResponse("/api/admin/dashboard", status_code=302)
+
 
 # -----------------------------
-# Create new cashier
+# Cashier management
 # -----------------------------
 @router.post("/cashiers")
 def create_cashier(user: UserCreate, db: Session = Depends(get_db)):
-    """
-    Create a new cashier:
-    - Role must be 'cashier'
-    - Username must be unique
-    """
     if user.role != "cashier":
         raise HTTPException(400, "Role must be cashier")
 
@@ -94,13 +96,9 @@ def create_cashier(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
     return {"id": new_user.id, "username": new_user.username, "full_name": new_user.full_name}
 
 
-# -----------------------------
-# Deactivate cashier
-# -----------------------------
 @router.delete("/cashiers/{cashier_id}")
 def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == cashier_id, User.role == "cashier").first()
@@ -112,7 +110,7 @@ def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db)):
 
 
 # -----------------------------
-# Add purchase / add stock
+# Inventory / Purchases
 # -----------------------------
 @router.post("/purchases")
 def add_purchase(
@@ -123,9 +121,6 @@ def add_purchase(
     purchase_price_per_kg: float = None,
     db: Session = Depends(get_db)
 ):
-    """
-    Add stock to existing item or create new item
-    """
     if kg_added is None or kg_added <= 0 or purchase_price_per_kg is None or purchase_price_per_kg <= 0:
         raise HTTPException(400, "Invalid kg or price")
 
@@ -133,11 +128,9 @@ def add_purchase(
         item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
         if not item:
             raise HTTPException(404, "Item not found")
-        # Update price per kg if needed
         item.current_price_per_kg = purchase_price_per_kg
         db.add(item)
     else:
-        # Create new inventory item
         item = InventoryItem(
             name=name,
             description=description,
@@ -149,7 +142,6 @@ def add_purchase(
         db.commit()
         db.refresh(item)
 
-    # Add ledger entry
     ledger = InventoryLedger(
         item_id=item.id,
         kg_change=kg_added,
@@ -159,27 +151,14 @@ def add_purchase(
         notes=f"Purchase added by admin {ADMIN_USER['username']}"
     )
     db.add(ledger)
-
-    # Update actual quantity
     item.quantity_available += kg_added
-
     db.commit()
     db.refresh(ledger)
     return {"id": ledger.id, "item_id": item.id, "kg_added": kg_added}
 
 
-# -----------------------------
-# Set selling price
-# -----------------------------
 @router.patch("/inventory/{item_id}/price")
-def set_selling_price(
-    item_id: int,
-    price: float = Query(..., gt=0),
-    db: Session = Depends(get_db)
-):
-    """
-    Update selling price per kg
-    """
+def set_selling_price(item_id: int, price: float = Query(..., gt=0), db: Session = Depends(get_db)):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -188,14 +167,8 @@ def set_selling_price(
     return {"id": item.id, "new_price": item.current_price_per_kg}
 
 
-# -----------------------------
-# Download Inventory Ledger
-# -----------------------------
 @router.get("/ledger/download")
 def download_ledger(db: Session = Depends(get_db)):
-    """
-    Download full inventory ledger as CSV
-    """
     ledger_entries = db.query(InventoryLedger).order_by(InventoryLedger.created_at.desc()).all()
 
     output = StringIO()

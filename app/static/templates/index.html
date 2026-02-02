@@ -87,13 +87,14 @@
             {% if error and error_role == 'cashier' %}
                 <div class="error">{{ error }}</div>
             {% endif %}
-            <form method="POST" action="/api/cashier/login">
-                <label>Username:</label>
-                <input type="text" name="username" required>
-                <label>Password:</label>
-                <input type="password" name="password" required>
-                <button type="submit">Login as Cashier</button>
-            </form>
+          <form method="POST" action="/api/auth/login">
+    <input type="hidden" name="role" value="cashier">  <!-- ADD THIS -->
+    <label>Username:</label>
+    <input type="text" name="username" required>
+    <label>Password:</label>
+    <input type="password" name="password" required>
+    <button type="submit">Login as Cashier</button>
+</form>
         </div>
 
     </div>

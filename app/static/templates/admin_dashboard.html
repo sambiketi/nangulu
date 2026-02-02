@@ -1,1 +1,90 @@
-This is a placeholder. Cashier dashboard temporarily disabled.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/admin_dashboard.js" defer></script>
+</head>
+<body>
+<div class="container">
+    <h1>Admin Dashboard</h1>
+
+    <!-- ---------------- Cashiers ---------------- -->
+    <section>
+        <h2>Cashiers</h2>
+        <button onclick="addCashier()">Add New Cashier</button>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Username</th><th>Full Name</th><th>Status</th></tr>
+            </thead>
+            <tbody id="cashiers-table">
+                {% for cashier in cashiers %}
+                <tr>
+                    <td>{{ cashier.id }}</td>
+                    <td>{{ cashier.username }}</td>
+                    <td>{{ cashier.full_name }}</td>
+                    <td>{{ "Active" if cashier.is_active else "Inactive" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ---------------- Inventory ---------------- -->
+    <section>
+        <h2>Inventory</h2>
+        <button onclick="addPurchase()">Add New Item</button>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Name</th><th>Price/Kg</th><th>Stock (Kg)</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="inventory-table">
+                {% for item in inventory %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td><input type="number" value="{{ item.current_price_per_kg }}" step="0.01" data-id="{{ item.id }}"></td>
+                    <td>{{ item.quantity_available }}</td>
+                    <td>
+                        <button onclick="addPurchase({{ item.id }})">Add Stock</button>
+                        <button onclick="setPrice({{ item.id }})">Set Price</button>
+                        <button onclick="viewItemSales({{ item.id }})">View Sales</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ---------------- Sales Ledger ---------------- -->
+    <section>
+        <h2>Sales Ledger</h2>
+        <button onclick="downloadLedger()">Download Full Ledger CSV</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sale #</th><th>Item</th><th>Kg Sold</th><th>Price/Kg</th>
+                    <th>Total Price</th><th>Cashier</th><th>Customer</th><th>Status</th><th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="sales-ledger">
+                {% for sale in sales %}
+                <tr>
+                    <td>{{ sale.sale_number }}</td>
+                    <td>{{ sale.item_name }}</td>
+                    <td>{{ sale.kg_sold }}</td>
+                    <td>{{ sale.price_per_kg_snapshot }}</td>
+                    <td>{{ sale.total_price }}</td>
+                    <td>{{ sale.cashier_name }}</td>
+                    <td>{{ sale.customer_name or '-' }}</td>
+                    <td>{{ sale.status }}</td>
+                    <td>{{ sale.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+</body>
+</html>

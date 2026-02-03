@@ -29,10 +29,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const resp = await fetch('/api/cashier/sales', {
+            const resp = await fetch('/cashier/sales', {  // CHANGED: /api/cashier/sales → /cashier/sales
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                credentials: 'include'  // Added to send session cookies
             });
 
             if (!resp.ok) throw new Error("Sale failed");
@@ -58,7 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function loadRecentSales() {
-        const resp = await fetch('/api/cashier/sales/recent');
+        const resp = await fetch('/cashier/sales/recent', {  // CHANGED: /api/cashier/sales/recent → /cashier/sales/recent
+            credentials: 'include'  // Added to send session cookies
+        });
         if (!resp.ok) return;
 
         const sales = await resp.json();

@@ -13,7 +13,7 @@ router = APIRouter()
 # In-memory cashiers for testing (plain text passwords)
 IN_MEMORY_CASHIERS = {
     "cashier1": {
-        "id": 2,  # Negative ID to avoid conflict with database
+        "id": 2,  
         "username": "cashier1",
         "password": "cashier123",  # Plain text
         "role": "cashier",
@@ -101,7 +101,7 @@ def cashier_dashboard(request: Request, db: Session = Depends(get_db), cashier: 
 # Confirm sale
 # -----------------------------
 @router.post("/sales")
-def confirm_sale(
+def complete_sale(
     sale: SaleCreate,
     db: Session = Depends(get_db),
     cashier: User = Depends(get_current_cashier)

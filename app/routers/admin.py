@@ -1,18 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload  # FIX: Added joinedload
 from io import StringIO
 import csv
 from datetime import datetime
 import bcrypt
+from decimal import Decimal
+from pydantic import BaseModel
 
-from app.models import User, InventoryItem, InventoryLedger
+from app.models import User, InventoryItem, InventoryLedger, Sale
 from app.schemas import UserCreate
 from app.dependencies import get_db
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="app/static/templates")
 router = APIRouter()
+
+# -----------------------------
+# Request schemas
+# -----------------------------
+class SetPriceRequest(BaseModel):
+    current_price_per_kg: float
+
+class AddStockRequest(BaseModel):
+    item_id: int | None = None
+    kg_added: float
+    purchase_price_per_kg: float | None = None
+    name: str | None = None
+    description: str | None = None
 
 # In-memory admin
 ADMIN_USER = {
@@ -34,7 +49,7 @@ def get_admin_password_hash():
     return ADMIN_USER["password_hash"]
 
 # -----------------------------
-# Admin dashboard
+# Admin dashboard - UPDATED to include sales
 # -----------------------------
 @router.get("/dashboard")
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
@@ -46,13 +61,20 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
 
     cashiers = db.query(User).filter(User.role == "cashier").all()
     inventory = db.query(InventoryItem).all()
+    
+    # FIX: Load sales with relationships for template
+    sales = db.query(Sale).options(
+        joinedload(Sale.item),
+        joinedload(Sale.cashier)
+    ).order_by(Sale.created_at.desc()).limit(100).all()
 
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
             "request": request,
             "cashiers": cashiers,
-            "inventory": inventory
+            "inventory": inventory,
+            "sales": sales  # FIX: Added sales data
         }
     )
 
@@ -114,27 +136,29 @@ def deactivate_cashier(cashier_id: int, db: Session = Depends(get_db)):
 # -----------------------------
 @router.post("/purchases")
 def add_purchase(
-    item_id: int = None,
-    name: str = None,
-    description: str = None,
-    kg_added: float = None,
-    purchase_price_per_kg: float = None,
+    request: AddStockRequest,
     db: Session = Depends(get_db)
 ):
-    if kg_added is None or kg_added <= 0 or purchase_price_per_kg is None or purchase_price_per_kg <= 0:
-        raise HTTPException(400, "Invalid kg or price")
-
-    if item_id:
-        item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if request.kg_added <= 0:
+        raise HTTPException(400, "Invalid kg amount")
+    
+    if request.item_id:
+        # Add stock to existing item
+        item = db.query(InventoryItem).filter(InventoryItem.id == request.item_id).first()
         if not item:
             raise HTTPException(404, "Item not found")
-        item.current_price_per_kg = purchase_price_per_kg
-        db.add(item)
+        
+        if request.purchase_price_per_kg:
+            item.purchase_price_per_kg = Decimal(str(request.purchase_price_per_kg))
     else:
+        # Create new item
+        if not request.name:
+            raise HTTPException(400, "Item name required for new items")
+        
         item = InventoryItem(
-            name=name,
-            description=description,
-            current_price_per_kg=purchase_price_per_kg,
+            name=request.name,
+            description=request.description or "",
+            current_price_per_kg=Decimal(str(request.purchase_price_per_kg)) if request.purchase_price_per_kg else Decimal('0'),
             quantity_available=0,
             is_active=True
         )
@@ -142,29 +166,90 @@ def add_purchase(
         db.commit()
         db.refresh(item)
 
+    # Create ledger entry
     ledger = InventoryLedger(
         item_id=item.id,
-        kg_change=kg_added,
+        kg_change=Decimal(str(request.kg_added)),
         source_type="PURCHASE",
         source_id=None,
         created_by=ADMIN_USER["id"],
-        notes=f"Purchase added by admin {ADMIN_USER['username']}"
+        notes=f"Purchase added by admin"
     )
     db.add(ledger)
-    item.quantity_available += kg_added
+    
+    # Update quantity with Decimal
+    item.quantity_available += Decimal(str(request.kg_added))
     db.commit()
-    db.refresh(ledger)
-    return {"id": ledger.id, "item_id": item.id, "kg_added": kg_added}
+    
+    return {"id": ledger.id, "item_id": item.id, "kg_added": request.kg_added}
 
 
 @router.patch("/inventory/{item_id}/price")
-def set_selling_price(item_id: int, price: float = Query(..., gt=0), db: Session = Depends(get_db)):
+def set_selling_price(
+    item_id: int, 
+    request: SetPriceRequest,
+    db: Session = Depends(get_db)
+):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
-    item.current_price_per_kg = price
+    
+    if request.current_price_per_kg <= 0:
+        raise HTTPException(400, "Price must be greater than 0")
+    
+    item.current_price_per_kg = Decimal(str(request.current_price_per_kg))
     db.commit()
-    return {"id": item.id, "new_price": item.current_price_per_kg}
+    return {"id": item.id, "new_price": float(item.current_price_per_kg)}
+
+
+# -----------------------------
+# Sales endpoints
+# -----------------------------
+@router.get("/sales/item/{item_id}")
+def get_item_sales(item_id: int, db: Session = Depends(get_db)):
+    sales = db.query(Sale).options(
+        joinedload(Sale.item),
+        joinedload(Sale.cashier)
+    ).filter(Sale.item_id == item_id).order_by(Sale.created_at.desc()).all()
+    
+    return [
+        {
+            "sale_number": sale.sale_number,
+            "item_name": sale.item.name if sale.item else "N/A",
+            "kg_sold": float(sale.kg_sold),
+            "price_per_kg_snapshot": float(sale.price_per_kg_snapshot),
+            "total_price": float(sale.total_price),
+            "cashier_name": sale.cashier.full_name if sale.cashier else "N/A",
+            "customer_name": sale.customer_name or "-",
+            "status": sale.status,
+            "created_at": sale.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        for sale in sales
+    ]
+
+
+# FIX: Added endpoint for loading all sales (for JavaScript refresh)
+@router.get("/sales/all")
+def get_all_sales(db: Session = Depends(get_db)):
+    sales = db.query(Sale).options(
+        joinedload(Sale.item),
+        joinedload(Sale.cashier)
+    ).order_by(Sale.created_at.desc()).limit(200).all()
+    
+    return [
+        {
+            "sale_number": sale.sale_number,
+            "item_name": sale.item.name if sale.item else "N/A",
+            "kg_sold": float(sale.kg_sold),
+            "price_per_kg_snapshot": float(sale.price_per_kg_snapshot),
+            "total_price": float(sale.total_price),
+            "cashier_name": sale.cashier.full_name if sale.cashier else "N/A",
+            "customer_name": sale.customer_name or "-",
+            "status": sale.status,
+            "created_at": sale.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        for sale in sales
+    ]
 
 
 @router.get("/ledger/download")

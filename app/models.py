@@ -17,6 +17,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)  # soft delete for cashiers
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    # FIX: Added relationships for accessing related data
+    sales = relationship("Sale", back_populates="cashier", foreign_keys="Sale.cashier_id")
+    inventory_ledgers = relationship("InventoryLedger", back_populates="creator", foreign_keys="InventoryLedger.created_by")
 
 # ------------------------------
 # Inventory
@@ -35,6 +39,10 @@ class InventoryItem(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    # FIX: Added relationships for accessing related data
+    sales = relationship("Sale", back_populates="item")
+    inventory_ledgers = relationship("InventoryLedger", back_populates="item")
 
 # ------------------------------
 # Sale
@@ -53,6 +61,10 @@ class Sale(Base):
     customer_name = Column(String(100))
     status = Column(String(10), default='ACTIVE')  # ACTIVE / REVERSED
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # FIX: Added relationships for accessing related data
+    item = relationship("InventoryItem", back_populates="sales")
+    cashier = relationship("User", back_populates="sales", foreign_keys=[cashier_id])
 
 # ------------------------------
 # Sale Reversal
@@ -80,3 +92,7 @@ class InventoryLedger(Base):
     notes = Column(Text)
     created_by = Column(Integer, ForeignKey('users.id'))
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # FIX: Added relationships for accessing related data
+    item = relationship("InventoryItem", back_populates="inventory_ledgers")
+    creator = relationship("User", back_populates="inventory_ledgers", foreign_keys=[created_by])

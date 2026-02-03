@@ -6,71 +6,196 @@ async function addCashier() {
 
     if (!username || !fullName || !password) return alert("All fields are required");
 
-    const resp = await fetch('/cashiers', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username, full_name: fullName, password})
-    });
+    try {
+        const resp = await fetch('/api/admin/cashiers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, full_name: fullName, password}),
+            credentials: 'include'
+        });
 
-    if (resp.ok) location.reload();
-    else alert("Error adding cashier");
+        if (resp.ok) {
+            location.reload();
+        } else {
+            const error = await resp.text();
+            alert("Error adding cashier: " + error);
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
 }
 
 // ----------------- Inventory -----------------
 async function setPrice(itemId) {
     const input = document.querySelector(`input[data-id='${itemId}']`);
     const price = parseFloat(input.value);
-    if (isNaN(price)) return alert("Invalid price");
+    if (isNaN(price) || price <= 0) return alert("Invalid price (must be > 0)");
 
-    const resp = await fetch(`/inventory/${itemId}/set-price`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({current_price_per_kg: price})
-    });
+    try {
+        const resp = await fetch(`/api/admin/inventory/${itemId}/price`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({current_price_per_kg: price}),
+            credentials: 'include'
+        });
 
-    if (resp.ok) location.reload();
-    else alert("Error updating price");
+        if (resp.ok) {
+            location.reload();
+        } else {
+            const error = await resp.text();
+            alert("Error updating price: " + error);
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
 }
 
 async function addPurchase(itemId) {
+    // If no itemId provided, we're creating a new item
+    if (!itemId) {
+        return addNewItem();
+    }
+    
+    // Otherwise, add stock to existing item
     const qty = prompt("Enter quantity to add (kg):");
-    if (!qty || isNaN(qty)) return alert("Invalid quantity");
+    if (!qty || isNaN(qty) || parseFloat(qty) <= 0) {
+        return alert("Invalid quantity (must be > 0)");
+    }
+    
+    const price = prompt("Enter purchase price per kg (optional, press Cancel to skip):");
+    const purchasePrice = price && !isNaN(price) ? parseFloat(price) : null;
 
-    const resp = await fetch(`/inventory/${itemId}/add-stock`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({kg_added: parseFloat(qty)})
-    });
+    try {
+        const resp = await fetch('/api/admin/purchases', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                item_id: itemId,
+                kg_added: parseFloat(qty),
+                purchase_price_per_kg: purchasePrice
+            }),
+            credentials: 'include'
+        });
 
-    if (resp.ok) location.reload();
-    else alert("Error adding stock");
+        if (resp.ok) {
+            location.reload();
+        } else {
+            const error = await resp.text();
+            alert("Error adding stock: " + error);
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+}
+
+// New function for adding a completely new item
+async function addNewItem() {
+    const name = prompt("Enter item name:");
+    if (!name) return alert("Item name is required");
+    
+    const description = prompt("Enter item description (optional):");
+    const qty = prompt("Enter initial quantity (kg):");
+    if (!qty || isNaN(qty) || parseFloat(qty) < 0) {
+        return alert("Invalid quantity");
+    }
+    
+    const price = prompt("Enter purchase price per kg:");
+    if (!price || isNaN(price) || parseFloat(price) <= 0) {
+        return alert("Valid price is required for new items");
+    }
+
+    try {
+        const resp = await fetch('/api/admin/purchases', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: name,
+                description: description || "",
+                kg_added: parseFloat(qty),
+                purchase_price_per_kg: parseFloat(price)
+            }),
+            credentials: 'include'
+        });
+
+        if (resp.ok) {
+            location.reload();
+        } else {
+            const error = await resp.text();
+            alert("Error adding new item: " + error);
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
 }
 
 // ----------------- Sales Ledger -----------------
 function downloadLedger() {
-    window.location.href = '/ledger/download';
+    window.location.href = '/api/admin/ledger/download';
 }
 
 // View sales for a specific item
 async function viewItemSales(itemId) {
-    const resp = await fetch(`/sales/item/${itemId}`);
-    if (!resp.ok) return alert("Error fetching sales");
+    try {
+        const resp = await fetch(`/api/admin/sales/item/${itemId}`, {
+            credentials: 'include'
+        });
+        if (!resp.ok) {
+            const error = await resp.text();
+            return alert("Error fetching sales: " + error);
+        }
 
-    const sales = await resp.json();
-    let html = '';
-    sales.forEach(s => {
-        html += `<tr>
-            <td>${s.sale_number}</td>
-            <td>${s.item_name}</td>
-            <td>${s.kg_sold}</td>
-            <td>${s.price_per_kg_snapshot}</td>
-            <td>${s.total_price}</td>
-            <td>${s.cashier_name}</td>
-            <td>${s.customer_name || '-'}</td>
-            <td>${s.status}</td>
-            <td>${s.created_at}</td>
-        </tr>`;
-    });
+        const sales = await resp.json();
+        let html = '';
+        sales.forEach(s => {
+            html += `<tr>
+                <td>${s.sale_number}</td>
+                <td>${s.item_name}</td>
+                <td>${s.kg_sold}</td>
+                <td>${s.price_per_kg_snapshot}</td>
+                <td>${s.total_price}</td>
+                <td>${s.cashier_name}</td>
+                <td>${s.customer_name || '-'}</td>
+                <td>${s.status}</td>
+                <td>${s.created_at}</td>
+            </tr>`;
+        });
 
-    document.getElementById('sales-ledger').innerHTML = html;
+        document.getElementById('sales-ledger').innerHTML = html;
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+}
+
+// FIX: Added function to load all sales (for Refresh button)
+async function loadAllSales() {
+    try {
+        const resp = await fetch('/api/admin/sales/all', {
+            credentials: 'include'
+        });
+        if (!resp.ok) {
+            alert("Error loading sales");
+            return;
+        }
+
+        const sales = await resp.json();
+        let html = '';
+        sales.forEach(s => {
+            html += `<tr>
+                <td>${s.sale_number}</td>
+                <td>${s.item_name}</td>
+                <td>${s.kg_sold}</td>
+                <td>${s.price_per_kg_snapshot}</td>
+                <td>${s.total_price}</td>
+                <td>${s.cashier_name}</td>
+                <td>${s.customer_name || '-'}</td>
+                <td>${s.status}</td>
+                <td>${s.created_at}</td>
+            </tr>`;
+        });
+
+        document.getElementById('sales-ledger').innerHTML = html;
+        alert("Sales refreshed successfully!");
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
 }

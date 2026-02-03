@@ -49,7 +49,7 @@
                     <td>
                         <button onclick="addPurchase({{ item.id }})">Add Stock</button>
                         <button onclick="setPrice({{ item.id }})">Set Price</button>
-                        <button onclick="viewItemSales({{ item.id }})">View Sales</button>
+                        <button onclick="viewItemSales({{ item.id }})">View Item Sales</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -61,6 +61,7 @@
     <section>
         <h2>Sales Ledger</h2>
         <button onclick="downloadLedger()">Download Full Ledger CSV</button>
+        <button onclick="loadAllSales()" style="margin-left: 10px;">Refresh All Sales</button>
         <table>
             <thead>
                 <tr>
@@ -72,14 +73,14 @@
                 {% for sale in sales %}
                 <tr>
                     <td>{{ sale.sale_number }}</td>
-                    <td>{{ sale.item_name }}</td>
+                    <td>{{ sale.item.name if sale.item else 'N/A' }}</td>
                     <td>{{ sale.kg_sold }}</td>
                     <td>{{ sale.price_per_kg_snapshot }}</td>
                     <td>{{ sale.total_price }}</td>
-                    <td>{{ sale.cashier_name }}</td>
+                    <td>{{ sale.cashier.full_name if sale.cashier else 'N/A' }}</td>
                     <td>{{ sale.customer_name or '-' }}</td>
                     <td>{{ sale.status }}</td>
-                    <td>{{ sale.created_at }}</td>
+                    <td>{{ sale.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

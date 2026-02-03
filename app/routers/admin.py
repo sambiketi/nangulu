@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from sqlalchemy.orm import Session, joinedload  # FIX: Added joinedload
+from sqlalchemy.orm import Session, joinedload
 from io import StringIO
 import csv
 from datetime import datetime
@@ -22,6 +22,9 @@ router = APIRouter()
 class SetPriceRequest(BaseModel):
     current_price_per_kg: float
 
+class SetPurchasePriceRequest(BaseModel):  # NEW: Schema for purchase price
+    purchase_price_per_kg: float
+
 class AddStockRequest(BaseModel):
     item_id: int | None = None
     kg_added: float
@@ -31,7 +34,7 @@ class AddStockRequest(BaseModel):
 
 # In-memory admin
 ADMIN_USER = {
-    "id": 0,
+    "id": 1,
     "username": "admin",
     "_password_plain": "admin123",
     "password_hash": None,
@@ -74,7 +77,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "cashiers": cashiers,
             "inventory": inventory,
-            "sales": sales  # FIX: Added sales data
+            "sales": sales
         }
     )
 
@@ -139,49 +142,101 @@ def add_purchase(
     request: AddStockRequest,
     db: Session = Depends(get_db)
 ):
-    if request.kg_added <= 0:
-        raise HTTPException(400, "Invalid kg amount")
+    print(f"=== DEBUG: Add purchase called ===")
+    print(f"Request: item_id={request.item_id}, kg={request.kg_added}, price={request.purchase_price_per_kg}")
     
-    if request.item_id:
-        # Add stock to existing item
-        item = db.query(InventoryItem).filter(InventoryItem.id == request.item_id).first()
-        if not item:
-            raise HTTPException(404, "Item not found")
+    try:
+        if request.kg_added <= 0:
+            raise HTTPException(400, "Invalid kg amount")
         
-        if request.purchase_price_per_kg:
-            item.purchase_price_per_kg = Decimal(str(request.purchase_price_per_kg))
-    else:
-        # Create new item
-        if not request.name:
-            raise HTTPException(400, "Item name required for new items")
-        
-        item = InventoryItem(
-            name=request.name,
-            description=request.description or "",
-            current_price_per_kg=Decimal(str(request.purchase_price_per_kg)) if request.purchase_price_per_kg else Decimal('0'),
-            quantity_available=0,
-            is_active=True
-        )
-        db.add(item)
-        db.commit()
-        db.refresh(item)
+        if request.item_id:
+            # Add stock to existing item
+            item = db.query(InventoryItem).filter(InventoryItem.id == request.item_id).first()
+            if not item:
+                raise HTTPException(404, "Item not found")
+            
+            # Update purchase price if provided
+            if request.purchase_price_per_kg is not None:
+                item.purchase_price_per_kg = Decimal(str(request.purchase_price_per_kg))
+                print(f"Updated purchase price to: {request.purchase_price_per_kg}")
+            else:
+                print("Keeping existing purchase price")
+        else:
+            # Create new item
+            if not request.name:
+                raise HTTPException(400, "Item name required for new items")
+            
+            if not request.purchase_price_per_kg:
+                raise HTTPException(400, "Purchase price required for new items")
+            
+            item = InventoryItem(
+                name=request.name,
+                description=request.description or "",
+                current_price_per_kg=Decimal(str(request.purchase_price_per_kg)),
+                purchase_price_per_kg=Decimal(str(request.purchase_price_per_kg)),
+                quantity_available=0,
+                is_active=True
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+            print(f"Created new item: {item.name}")
 
-    # Create ledger entry
-    ledger = InventoryLedger(
-        item_id=item.id,
-        kg_change=Decimal(str(request.kg_added)),
-        source_type="PURCHASE",
-        source_id=None,
-        created_by=ADMIN_USER["id"],
-        notes=f"Purchase added by admin"
-    )
-    db.add(ledger)
+        # Create ledger entry
+        kg_change_decimal = Decimal(str(request.kg_added)).quantize(Decimal('0.001'))
+        
+        ledger = InventoryLedger(
+            item_id=item.id,
+            kg_change=kg_change_decimal,
+            source_type="PURCHASE",
+            source_id=None,
+            created_by=ADMIN_USER["id"],
+            notes=f"Purchase added by admin"
+        )
+        db.add(ledger)
+        
+        # Update quantity
+        item.quantity_available += kg_change_decimal
+        db.commit()
+        print(f"=== DEBUG: Purchase completed successfully ===")
+        
+        return {"id": ledger.id, "item_id": item.id, "kg_added": float(kg_change_decimal)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"=== ERROR in add_purchase: {str(e)} ===")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(500, f"Internal server error: {str(e)}")
+
+
+# NEW ROUTE: Set purchase price
+@router.patch("/inventory/{item_id}/purchase-price")
+def set_purchase_price(
+    item_id: int, 
+    request: SetPurchasePriceRequest,  # Use the new schema
+    db: Session = Depends(get_db)
+):
+    print(f"=== DEBUG: Set purchase price for item {item_id} to {request.purchase_price_per_kg}")
     
-    # Update quantity with Decimal
-    item.quantity_available += Decimal(str(request.kg_added))
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    
+    if request.purchase_price_per_kg <= 0:
+        raise HTTPException(400, "Purchase price must be greater than 0")
+    
+    item.purchase_price_per_kg = Decimal(str(request.purchase_price_per_kg))
     db.commit()
+    print(f"=== DEBUG: Purchase price updated successfully ===")
     
-    return {"id": ledger.id, "item_id": item.id, "kg_added": request.kg_added}
+    return {
+        "id": item.id, 
+        "new_purchase_price": float(item.purchase_price_per_kg),
+        "item_name": item.name
+    }
 
 
 @router.patch("/inventory/{item_id}/price")
@@ -228,7 +283,6 @@ def get_item_sales(item_id: int, db: Session = Depends(get_db)):
     ]
 
 
-# FIX: Added endpoint for loading all sales (for JavaScript refresh)
 @router.get("/sales/all")
 def get_all_sales(db: Session = Depends(get_db)):
     sales = db.query(Sale).options(

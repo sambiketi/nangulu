@@ -26,10 +26,38 @@ async function addCashier() {
 }
 
 // ----------------- Inventory -----------------
-async function setPrice(itemId) {
-    const input = document.querySelector(`input[data-id='${itemId}']`);
+// NEW FUNCTION: Set purchase price
+async function setPurchasePrice(itemId) {
+    const input = document.querySelector(`input[data-id='${itemId}'][data-field='purchase_price']`);
     const price = parseFloat(input.value);
-    if (isNaN(price) || price <= 0) return alert("Invalid price (must be > 0)");
+    if (isNaN(price) || price <= 0) return alert("Invalid purchase price (must be > 0)");
+
+    try {
+        const resp = await fetch(`/api/admin/inventory/${itemId}/purchase-price`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({purchase_price_per_kg: price}),
+            credentials: 'include'
+        });
+
+        const responseText = await resp.text();
+        console.log('Set purchase price response:', resp.status, responseText);
+        
+        if (resp.ok) {
+            location.reload();
+        } else {
+            alert("Error updating purchase price: " + responseText);
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+}
+
+// EXISTING FUNCTION: Set selling price (kept as is)
+async function setPrice(itemId) {
+    const input = document.querySelector(`input[data-id='${itemId}'][data-field='selling_price']`);
+    const price = parseFloat(input.value);
+    if (isNaN(price) || price <= 0) return alert("Invalid selling price (must be > 0)");
 
     try {
         const resp = await fetch(`/api/admin/inventory/${itemId}/price`, {
@@ -39,17 +67,20 @@ async function setPrice(itemId) {
             credentials: 'include'
         });
 
+        const responseText = await resp.text();
+        console.log('Set selling price response:', resp.status, responseText);
+        
         if (resp.ok) {
             location.reload();
         } else {
-            const error = await resp.text();
-            alert("Error updating price: " + error);
+            alert("Error updating selling price: " + responseText);
         }
     } catch (err) {
         alert("Error: " + err.message);
     }
 }
 
+// EXISTING FUNCTION: Add stock (kept as is with minor improvement)
 async function addPurchase(itemId) {
     // If no itemId provided, we're creating a new item
     if (!itemId) {
@@ -62,8 +93,24 @@ async function addPurchase(itemId) {
         return alert("Invalid quantity (must be > 0)");
     }
     
-    const price = prompt("Enter purchase price per kg (optional, press Cancel to skip):");
-    const purchasePrice = price && !isNaN(price) ? parseFloat(price) : null;
+    // Try to get purchase price from input field first
+    const purchasePriceInput = document.querySelector(`input[data-id='${itemId}'][data-field='purchase_price']`);
+    let purchasePrice = null;
+    
+    if (purchasePriceInput && purchasePriceInput.value) {
+        purchasePrice = parseFloat(purchasePriceInput.value);
+        if (!isNaN(purchasePrice) && purchasePrice > 0) {
+            console.log("Using purchase price from field:", purchasePrice);
+        } else {
+            purchasePrice = null;
+        }
+    }
+    
+    // If no purchase price in field, ask user
+    if (!purchasePrice) {
+        const price = prompt("Enter purchase price per kg (optional, press Cancel to skip):");
+        purchasePrice = price && !isNaN(price) && parseFloat(price) > 0 ? parseFloat(price) : null;
+    }
 
     try {
         const resp = await fetch('/api/admin/purchases', {
@@ -77,18 +124,20 @@ async function addPurchase(itemId) {
             credentials: 'include'
         });
 
+        const responseText = await resp.text();
+        console.log('Add stock response:', resp.status, responseText);
+        
         if (resp.ok) {
             location.reload();
         } else {
-            const error = await resp.text();
-            alert("Error adding stock: " + error);
+            alert("Error adding stock: " + responseText);
         }
     } catch (err) {
         alert("Error: " + err.message);
     }
 }
 
-// New function for adding a completely new item
+// EXISTING FUNCTION: Add new item (kept as is)
 async function addNewItem() {
     const name = prompt("Enter item name:");
     if (!name) return alert("Item name is required");
@@ -117,6 +166,9 @@ async function addNewItem() {
             credentials: 'include'
         });
 
+        const responseText = await resp.text();
+        console.log('Add new item response:', resp.status, responseText);
+        
         if (resp.ok) {
             location.reload();
         } else {
@@ -133,7 +185,7 @@ function downloadLedger() {
     window.location.href = '/api/admin/ledger/download';
 }
 
-// View sales for a specific item
+// EXISTING FUNCTION: View sales for a specific item (kept as is)
 async function viewItemSales(itemId) {
     try {
         const resp = await fetch(`/api/admin/sales/item/${itemId}`, {
@@ -166,7 +218,7 @@ async function viewItemSales(itemId) {
     }
 }
 
-// FIX: Added function to load all sales (for Refresh button)
+// EXISTING FUNCTION: Load all sales (kept as is)
 async function loadAllSales() {
     try {
         const resp = await fetch('/api/admin/sales/all', {

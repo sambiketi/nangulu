@@ -37,18 +37,40 @@
         <button onclick="addPurchase()">Add New Item</button>
         <table>
             <thead>
-                <tr><th>ID</th><th>Name</th><th>Price/Kg</th><th>Stock (Kg)</th><th>Actions</th></tr>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Purchase Price/Kg</th>
+                    <th>Selling Price/Kg</th>
+                    <th>Stock (Kg)</th>
+                    <th>Actions</th>
+                </tr>
             </thead>
             <tbody id="inventory-table">
                 {% for item in inventory %}
                 <tr>
                     <td>{{ item.id }}</td>
                     <td>{{ item.name }}</td>
-                    <td><input type="number" value="{{ item.current_price_per_kg }}" step="0.01" data-id="{{ item.id }}"></td>
+                    <td>
+                        <input type="number" 
+                               value="{{ item.purchase_price_per_kg if item.purchase_price_per_kg else '' }}" 
+                               step="0.01" 
+                               data-id="{{ item.id }}"
+                               data-field="purchase_price"
+                               placeholder="Not set">
+                    </td>
+                    <td>
+                        <input type="number" 
+                               value="{{ item.current_price_per_kg }}" 
+                               step="0.01" 
+                               data-id="{{ item.id }}"
+                               data-field="selling_price">
+                    </td>
                     <td>{{ item.quantity_available }}</td>
                     <td>
                         <button onclick="addPurchase({{ item.id }})">Add Stock</button>
-                        <button onclick="setPrice({{ item.id }})">Set Price</button>
+                        <button onclick="setPurchasePrice({{ item.id }})">Set Purchase Price</button>
+                        <button onclick="setPrice({{ item.id }})">Set Selling Price</button>
                         <button onclick="viewItemSales({{ item.id }})">View Item Sales</button>
                     </td>
                 </tr>

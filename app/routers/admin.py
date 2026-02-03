@@ -34,7 +34,7 @@ class AddStockRequest(BaseModel):
 
 # In-memory admin
 ADMIN_USER = {
-    "id": 1,
+    "id": 0,
     "username": "admin",
     "_password_plain": "admin123",
     "password_hash": None,

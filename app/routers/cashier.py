@@ -128,6 +128,7 @@ def complete_sale(
         price_per_kg_snapshot=item.current_price_per_kg,
         total_price=total_price,
         cashier_id=cashier.id,
+        payment_type=sale.payment_type,  # ← FIXED: Added missing required field
         customer_name=sale.customer_name,
         status="ACTIVE"
     )
